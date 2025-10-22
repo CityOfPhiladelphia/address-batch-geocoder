@@ -1,0 +1,15 @@
+[project]
+name = "address-geocoder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "ipython>=8.18.1",
+    "passyunk",
+    "pytest>=8.4.2",
+    "pyyaml>=6.0.3",
+]
+
+[tool.uv.sources]
+passyunk = { git = "https://github.com/CityOfPhiladelphia/passyunk" }

@@ -1,0 +1,18 @@
+
+# Connection Credentials
+AIS_API_KEY:
+
+DB_HOSTNAME:
+DB_USERNAME:
+DB_PASSWORD:
+
+# File Config
+input_file:
+
+full_address_field:
+
+address_fields:
+  street:
+  city:
+  state:
+  zip:
