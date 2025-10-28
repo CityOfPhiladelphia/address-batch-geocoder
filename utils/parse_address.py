@@ -1,15 +1,14 @@
 import yaml
 from typing import List
 
-def generate_field_list(config_path: str ='./config.yml') -> List[str]:
+def generate_field_list(config_path) -> List[str]:
     """
     Parses which address fields to consider in the input file based on
     the content of config.yml. Raises an error if neither full_address_field
     nor street are specified in the config file.
 
     Args:
-        config_path (str): Defaults to './config.yml'. The path of the config
-        file.
+        config_path (str): The path of the config file.
     
     Returns list: A list of address field names in the input file.
 
@@ -31,7 +30,7 @@ def generate_field_list(config_path: str ='./config.yml') -> List[str]:
     fields = [v for v in addr_fields.values() if v is not None]
     return fields
 
-def parse_address(parser, address: str) -> tuple[str, bool]:    
+def parse_address(parser, address: str) -> tuple[str, bool,bool]:    
     """
     Given an address string, uses PassyunkParser to return
     a standardized address, and whether or not the given string
@@ -55,4 +54,7 @@ def parse_address(parser, address: str) -> tuple[str, bool]:
     # If address matches to a street code, it is a philly address
     is_philly_addr = bool(parsed['street']['street_code'])
 
-    return (output_address, is_addr, is_philly_addr)
+    return {"output_address": output_address, 
+            "is_addr": is_addr,
+            "is_philly_addr": is_philly_addr
+            }

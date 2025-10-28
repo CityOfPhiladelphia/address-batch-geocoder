@@ -2,7 +2,8 @@
 # Connection Credentials
 AIS_API_KEY:
 
-DB_HOSTNAME:
+DB_NAME:
+DB_HOST:
 DB_USERNAME:
 DB_PASSWORD:
 
