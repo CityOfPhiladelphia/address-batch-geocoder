@@ -1,5 +1,6 @@
 import yaml, polars as pl
 from utils.parse_address import generate_field_list, parse_address
+from utils.db_lookup import append
 from passyunk.parser import PassyunkParser
 
 def process_csv(config_path) -> pl.LazyFrame:
@@ -51,7 +52,9 @@ def process_csv(config_path) -> pl.LazyFrame:
         ).alias("temp_struct")
     ).unnest("temp_struct")
     
-    return lf
+    df_appended = append(lf, config_path)
+
+    return df_appended
 
     
 
