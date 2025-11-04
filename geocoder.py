@@ -1,9 +1,15 @@
-import yaml, polars as pl, requests
+import yaml, polars as pl, requests, click
+from datetime import datetime
 from utils.parse_address import find_address_fields, parse_address
 from utils.ais_lookup import split_geos, ais_lookup
 from mapping.ais_properties_fields import fields
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
+
+def get_current_time():
+    current_datetime = datetime.now()
+    return current_datetime.strftime("%H:%M:%S")
+
 
 
 def parse_with_passyunk_parser(lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -142,7 +148,12 @@ def append_with_ais(
     
     return appended
 
-
+@click.command()
+@click.option('--config_path', 
+              default='./config.yml',
+              prompt=True,
+              show_default = './config.yml',
+              help='The path to the config file.')
 def process_csv(config_path) -> pl.LazyFrame:
     """
     Given a config file with the csv filepath, normalizes records
@@ -167,6 +178,10 @@ def process_csv(config_path) -> pl.LazyFrame:
         raise ValueError(
             "A filepath for the geography file must be" "specified in the config."
         )
+    # ---------------- Join Addresses to Address File -------------------#
+
+    current_time = get_current_time()
+    print(f"Joining addresses to address file at {current_time}.")
 
     # Determine which fields in the file are the address fields
     address_fields = find_address_fields(config_path)
@@ -192,6 +207,12 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     # Split out fields that did not match the address file
     # and attempt to match them with the AIS API
+
+
+    # -------------------------- Append Fields from AIS ------------------ #
+    current_time = get_current_time()
+    print(f"Appending fields from AIS at {get_current_time()}")
+
     has_geo, needs_geo = split_geos(joined_lf)
 
     ais_appended = append_with_ais(config, needs_geo, ais_append_fields)
@@ -199,7 +220,7 @@ def process_csv(config_path) -> pl.LazyFrame:
     rejoined = (
         pl.concat([has_geo, ais_appended])
         .sort("__geocode_idx__")
-        .drop("__geocode_idx__")
+        .drop(["__geocode_idx__", "joined_address"])
     )
 
     in_path = PurePath(filepath)
@@ -212,3 +233,10 @@ def process_csv(config_path) -> pl.LazyFrame:
     out_path = str(in_path.parent / out_path)
 
     rejoined.sink_csv(out_path)
+
+    current_time = get_current_time()
+    print(f"Append complete at {current_time}.")
+
+
+if __name__ == "__main__":
+    process_csv()
