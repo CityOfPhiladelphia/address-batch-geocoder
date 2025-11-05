@@ -211,3 +211,6 @@ data/
 
 # Config Files
 config.yml
+
+# Old data
+old/

@@ -1,85 +1,81 @@
-import requests, polars as pl
+import requests, polars as pl, time
 from retrying import retry
 
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
-
 @retry(wait_exponential_multiplier=1000, wait_exponential_max=10000, stop_max_attempt_number=5)
-def ais_lookup(sess: requests.Session, api_key: str, address: str) -> tuple[str, bool, bool]:
+def ais_lookup(
+    sess: requests.Session, api_key: str, address: str, append_fields: list
+) -> tuple[str, bool, bool, float, float]:
     """
     Given a passyunk-normalized address, looks up whether or not it is in the
-    database. 
-    
+    database.
+
     Args:
         sess (requests Session object): A requests library session object
         api_key (str): An AIS api key
         address (str): The address to query
-    
+        append_fields (list): The fields to append from AIS
+
     Returns:
         The standardized address
     """
-
-    ais_url = 'https://api.phila.gov/ais/v1/search/' + address
+    time.sleep(0.1) # Limit requests to 10 per second, per AIS limits
+    ais_url = "https://api.phila.gov/ais/v1/search/" + address
     params = {}
-    params['gatekeeperKey'] = api_key
+    params["gatekeeperKey"] = api_key
 
     response = sess.get(ais_url, params=params, timeout=10)
 
     if response.status_code >= 500:
-        raise Exception('5xx response')
+        raise Exception("5xx response")
     elif response.status_code == 429:
-        raise Exception('429 response')
-    
+        raise Exception("429 response")
+
+    out_data = {}
     if response.status_code == 200:
-        address = response['features'][0]['street_address']
-        is_addr = True
-        is_philly_addr = True
+        r_json = response.json()["features"][0]
+        address = r_json.get("properties", "").get("street_address", "")
 
-        return(address, is_addr, is_philly_addr)
+        try:
+            lon, lat = r_json["geometry"]["coordinates"]
 
-    return (None, False, False)
+        except KeyError:
+            lon, lat = ""
 
-    
-def stream_null_geos(data: pl.LazyFrame, batch_rows: int):
-    needs_geo = data.filter(
-        (pl.col("latitude").is_null() | pl.col("latitude").is_nan()) |
-        (pl.col("longitude").is_null() | pl.col("longitude").is_nan())
+        out_data["output_address"] = address
+        out_data["is_addr"] = True
+        out_data["is_philly_addr"] = True
+        out_data["geocode_lat"] = str(lat)
+        out_data["geocode_lon"] = str(lon)
+
+        for field in append_fields:
+            out_data[field] = r_json.get("properties", "").get(field, "")
+
+        return out_data
+
+    out_data["output_address"] = ""
+    out_data["is_addr"] = False
+    out_data["is_philly_addr"] = False
+    out_data["geocode_lat"] = None
+    out_data["geocode_lon"] = None
+
+    for field in append_fields:
+        out_data[field] = None
+
+    return out_data
+
+def split_geos(data: pl.LazyFrame):
+    """
+    Splits a lazyframe into two lazy frames: one for records with latitude
+    and longitude, and another for records without latitude and longitude.
+    Used to determine which records need to be appended using AIS.
+    """
+    has_geo = data.filter(
+        (~pl.col("geocode_lat").is_null()) & (~pl.col("geocode_lon").is_null())
     )
-    start = 0
-    while True:
-        batch_df = (
-            needs_geo
-            .slice(offset=start, length=batch_rows)
-            .collect(streaming=True)
-        )
-        if batch_df.is_empty():
-            break
+    needs_geo = data.filter(
+        (pl.col("geocode_lat").is_null()) | (pl.col("geocode_lon").is_null())
+    )
 
-        yield batch_df
-        start += len(batch_df)
-
-
-def ais_append(
-        sess: requests.Session, api_key: str, data: pl.LazyFrame, 
-        batch_rows: int = 50_000) -> pl.LazyFrame:
-    
-    """
-    Takes a dataframe of databridge-appended geodata and attempts to
-    look up records that did not append from databridge.
-
-    Args:
-        sess: a requests library session object
-        api_key: the AIS api key
-        data: A polars lazy dataframe with databridge-appended latitude and
-        longitude
-    
-    Returns:
-        polars lazy frame with ais-appended records
-    """
-
-    # Ensure incoming data is in right format
-    lf_schema = data.collect_schema().names()
-
-    if any(col not in lf_schema for col in ('output_address','is_addr','is_philly_addr')):
-        raise ValueError("An appended dataframe must be passed.")
-    
+    return (has_geo, needs_geo)

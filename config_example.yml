@@ -2,18 +2,27 @@
 # Connection Credentials
 AIS_API_KEY:
 
-DB_NAME:
-DB_HOST:
-DB_USERNAME:
-DB_PASSWORD:
-
-# File Config
+# Input File Config
 input_file:
+geography_file:
 
 full_address_field:
 
+# OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
   street:
   city:
   state:
   zip:
+
+# Output Appended Fields
+append_fields:
+  - census_tract_2020
+  - census_block_group_2020
+  - census_block_2020
+  - seg_id
+  - opa_owners
+  - us_congressional_2022
+  # ADD MORE FIELDS BELOW, EG: 
+  # - census_tract_2010
+  # - seg_id
