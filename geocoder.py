@@ -1,15 +1,15 @@
 import yaml, polars as pl, requests, click
 from datetime import datetime
 from utils.parse_address import find_address_fields, parse_address
-from utils.ais_lookup import split_geos, ais_lookup
+from utils.ais_lookup import split_geos, throttle_ais_lookup
 from mapping.ais_properties_fields import fields
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
 
+
 def get_current_time():
     current_datetime = datetime.now()
     return current_datetime.strftime("%H:%M:%S")
-
 
 
 def parse_with_passyunk_parser(lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -135,7 +135,7 @@ def append_with_ais(
             to_append.with_columns(
                 pl.col("output_address")
                 .map_elements(
-                    lambda a: ais_lookup(sess, API_KEY, a, append_fields),
+                    lambda a: throttle_ais_lookup(sess, API_KEY, a, append_fields),
                     return_dtype=new_cols,
                 )
                 .alias("temp_struct")
@@ -145,15 +145,18 @@ def append_with_ais(
             )
             .drop("temp_struct")
         )
-    
+
     return appended
 
+
 @click.command()
-@click.option('--config_path', 
-              default='./config.yml',
-              prompt=True,
-              show_default = './config.yml',
-              help='The path to the config file.')
+@click.option(
+    "--config_path",
+    default="./config.yml",
+    prompt=True,
+    show_default="./config.yml",
+    help="The path to the config file.",
+)
 def process_csv(config_path) -> pl.LazyFrame:
     """
     Given a config file with the csv filepath, normalizes records
@@ -207,7 +210,6 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     # Split out fields that did not match the address file
     # and attempt to match them with the AIS API
-
 
     # -------------------------- Append Fields from AIS ------------------ #
     current_time = get_current_time()
