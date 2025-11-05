@@ -32,7 +32,16 @@ fields that the user supplies.
 
 In order to run `Address Geocoder`, first set up the configuration file. By default,
 `Address Geocoder` searchers for a file named `config.yml`. This is the recommended config filename. You can copy the template in
-`config_example.yml` to a file named `config.yml` and continue from there. Detailed steps are below:
+`config_example.yml` to a file named `config.yml` and continue from there. Detailed steps are below.
+
+Then, run:
+
+```
+python3 geocoder.py
+```
+
+The dialogue will ask you to specify a config file. Hit enter without typing anything to
+keep the default config file ('./config.yml')
 
 ### Configuration
 1. Copy `config_example.yml` to `config.yml` by running in the terminal:
@@ -103,6 +112,18 @@ append_fields:
   - census_block_group_2020
   - census_block_2020
 ```
+
+6. You're now ready to run the geocoder:
+
+```
+python3 geocoder.py
+```
+
+The dialogue will ask you to specify a config file. Hit enter without typing anything to
+keep the default config file ('./config.yml')
+
+The output file will be saved in the same location as your input file, with _appended attached to the filename.
+
 ## Testing
 This package uses the pytest module to conduct unit tests. Tests are
 located in the `tests/` folder.
