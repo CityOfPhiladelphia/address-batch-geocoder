@@ -1,13 +1,18 @@
 # address-geocoder
 A tool to standardize and geocode Philadelphia addresses
 
-## Setup
+## 1. Setup
 You will need the following things:
 1. An addresses file, provided to you by CityGeo. 
 2. An AIS API key, provided to you by CityGeo.
 3. Python installed on your computer, at least version 3.9
 
-Next, create a virtual environment:
+To download, use git:
+```
+git clone git@github.com:CityOfPhiladelphia/address-geocoder.git
+```
+
+Next, navigate to the project's directory and create a virtual environment:
 ```
 python3 -m venv venv
 ```
@@ -25,14 +30,14 @@ pip install -r requirements.txt
 
 Once you have installed everything, it is time to fill in the config file.
 
-## How to Use Address Geocoder
+## 2. How to Use Address Geocoder
 Address Geocoder takes an input file containing addresses 
 and appends latitude and longitude to those addresses, as well as any optional
 fields that the user supplies.
 
 In order to run `Address Geocoder`, first set up the configuration file. By default,
 `Address Geocoder` searchers for a file named `config.yml`. This is the recommended config filename. You can copy the template in
-`config_example.yml` to a file named `config.yml` and continue from there. Detailed steps are below.
+`config_example.yml` to a file named `config.yml` and continue from there. Detailed steps for filling out the config file are in the next section.
 
 Then, run:
 
@@ -78,8 +83,8 @@ address_fields:
   zip: addr_zip
 ```
 5. List which fields other than latitude and longitude you want to append.
-(Latitude and longitude will always be appended.) A complete list of fields 
-can be found further down in this README. 
+(Latitude and longitude will always be appended.) If you enter an invalid field, the program will error out and ask you to try again.
+A complete list of valid fields can be found further down in this README. 
 
 ```
 append_fields:
@@ -124,6 +129,21 @@ keep the default config file ('./config.yml')
 
 The output file will be saved in the same location as your input file, with _appended attached to the filename.
 
+## How The Geocoder Works
+`Address-Geocoder` processes a csv file with addresses, and geolocates those
+addresses using the following steps:
+
+1. Takes an input file of addresses, and standardizes those 
+addresses using `passyunk`, Philadelphia's address standardization system.
+2. Compares the standardized data to a local parquet file, `addresses.parquet`,
+and appends the user-specified fields as well as latitude and longitude from that file
+3. Not all records will match to the address file. For those records that do not match,
+`Address-Geocoder` queries the Address Information System (AIS) API and appends returned fields.
+Please note that this process can take some time, so processing large files with a messy address field
+is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take
+approximately 3-4 minutes.
+5. The appended file is then saved to the same directory as the input file.
+
 ## Testing
 This package uses the pytest module to conduct unit tests. Tests are
 located in the `tests/` folder.
@@ -142,18 +162,6 @@ To run one test within a file:
 ```
 python3 pytest tests/test_parser.py::test_parse_address
 ```
-
-## How This Works
-`Address-Geocoder` processes a csv file with addresses, and geolocates those
-addresses using the following steps:
-
-1. Takes an input file of addresses, and standardizes those 
-addresses using `passyunk`, Philadelphia's address standardization system.
-2. Compares the standardized data to a local parquet file, `addresses.parquet`,
-and appends the user-specified fields as well as latitude and longitude from that file
-3. Not all records will match to the address file. For those records that do not match,
-`Address-Geocoder` queries the Address Information System (AIS) API and appends returned fields.
-4. The appended file is then saved to the same directory as the input file.
 
 ## Append Fields
 | `Field` |
