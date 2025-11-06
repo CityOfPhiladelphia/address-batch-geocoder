@@ -17,13 +17,13 @@ Alternatively, you can download the repository as a zip file using GitHub's web 
 
 Next, navigate to the project's directory and create a virtual environment:
 ```
-python3 -m venv venv
+python -m venv .venv
 ```
 
 Then, activate the virtual environment. This will need to be activated
 every time you want to run the append tool, not just this once:
 ```
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
 Finally, install the packages in requirements.text:
