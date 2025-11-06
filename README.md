@@ -21,7 +21,7 @@ python -m venv .venv
 ```
 
 Then, activate the virtual environment. This will need to be activated
-every time you want to run the append tool, not just this once:
+every time you want to run the enrichment tool, not just this once:
 ```
 source .venv/bin/activate
 ```
@@ -35,7 +35,7 @@ Once you have installed everything, it is time to fill in the config file.
 
 ## 2. How to Use Address Geocoder
 Address Geocoder takes an input file containing addresses 
-and appends latitude and longitude to those addresses, as well as any optional
+and adds latitude and longitude to those addresses, as well as any optional
 fields that the user supplies.
 
 In order to run `Address Geocoder`, first set up the configuration file. By default,
@@ -61,7 +61,7 @@ cp config_example.yml config.yml
 ```
 AIS_API_KEY:
 ```
-3. Add the filepath for the input file (the file that you wish to append to), and the geography file (the address file you have been given.) This should look something like this:
+3. Add the filepath for the input file (the file that you wish to enrich), and the geography file (the address file you have been given.) This should look something like this:
 ```
 input_file: ./data/example_input_4.csv
 geography_file: ./data/addresses.parquet
@@ -85,12 +85,12 @@ address_fields:
   state:
   zip: addr_zip
 ```
-5. List which fields other than latitude and longitude you want to append.
-(Latitude and longitude will always be appended.) If you enter an invalid field, the program will error out and ask you to try again.
+5. List which fields other than latitude and longitude you want to add.
+(Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
 A complete list of valid fields can be found further down in this README. 
 
 ```
-append_fields:
+enrichment_fields:
   - census_tract_2020
   - census_block_group_2020
   - census_block_2020
@@ -114,8 +114,8 @@ address_fields:
   state:
   zip:
 
-# Append Fields -- Aside from coordinates, what fields to append
-append_fields:
+# Enrichment Fields -- Aside from coordinates, what fields to add
+enrichment_fields:
   - census_tract_2020
   - census_block_group_2020
   - census_block_2020
@@ -130,7 +130,7 @@ python3 geocoder.py
 The dialogue will ask you to specify a config file. Hit enter without typing anything to
 keep the default config file ('./config.yml')
 
-The output file will be saved in the same location as your input file, with _appended attached to the filename.
+The output file will be saved in the same location as your input file, with _enriched attached to the filename.
 
 ## How The Geocoder Works
 `Address-Geocoder` processes a csv file with addresses, and geolocates those
@@ -139,13 +139,13 @@ addresses using the following steps:
 1. Takes an input file of addresses, and standardizes those 
 addresses using `passyunk`, Philadelphia's address standardization system.
 2. Compares the standardized data to a local parquet file, `addresses.parquet`,
-and appends the user-specified fields as well as latitude and longitude from that file
+and adds the user-specified fields as well as latitude and longitude from that file
 3. Not all records will match to the address file. For those records that do not match,
-`Address-Geocoder` queries the Address Information System (AIS) API and appends returned fields.
+`Address-Geocoder` queries the Address Information System (AIS) API and adds returned fields.
 Please note that this process can take some time, so processing large files with a messy address field
 is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take
 approximately 3-4 minutes.
-5. The appended file is then saved to the same directory as the input file.
+5. The enriched file is then saved to the same directory as the input file.
 
 ## Testing
 This package uses the pytest module to conduct unit tests. Tests are
@@ -166,7 +166,7 @@ To run one test within a file:
 python3 pytest tests/test_parser.py::test_parse_address
 ```
 
-## Append Fields
+## Enrichment Fields
 | `Field` |
 | --- |
 |`address_low`|
