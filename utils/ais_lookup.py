@@ -95,7 +95,7 @@ def ais_lookup(
                 out_data[field] = ''
             
             else:
-                out_data[field] = field_value
+                out_data[field] = str(field_value)
 
         return out_data
 
