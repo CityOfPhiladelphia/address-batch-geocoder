@@ -61,7 +61,7 @@ def ais_lookup(
     params = {}
     params["gatekeeperKey"] = api_key
 
-    response = sess.get(ais_url, params=params, timeout=10)
+    response = sess.get(ais_url, params=params, timeout=10, verify=False)
 
     if response.status_code >= 500:
         raise Exception("5xx response")
