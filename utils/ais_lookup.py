@@ -1,4 +1,4 @@
-import requests, polars as pl, time
+import requests, time
 from retrying import retry
 
 
@@ -93,13 +93,13 @@ def ais_lookup(
             # empty list
             if not field_value:
                 out_data[field] = None
-            
+
             else:
                 out_data[field] = str(field_value)
 
         return out_data
 
-    out_data["output_address"] = ""
+    out_data["output_address"] = address
     out_data["is_addr"] = False
     out_data["is_philly_addr"] = False
     out_data["geocode_lat"] = None

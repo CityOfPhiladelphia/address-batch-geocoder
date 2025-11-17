@@ -53,7 +53,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
     }
 
 
-def test_false_address_returns_none_if_bad_address(monkeypatch):
+def test_false_address_returns_input_address_if_bad_address(monkeypatch):
 
     class FakeResponse:
         def __init__(self, data, status_code=404):
@@ -81,12 +81,13 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
 
-    result = ais_lookup.ais_lookup(sess, "1234", "1234 fake st", [])
-
+    address = "123 fake st"
+    result = ais_lookup.ais_lookup(sess, "1234", address, [])
+    
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
         "is_addr": False,
         "is_philly_addr": False,
-        "output_address": "",
+        "output_address": "123 fake st",
     }

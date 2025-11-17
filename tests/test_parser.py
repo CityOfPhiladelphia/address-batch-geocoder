@@ -1,10 +1,17 @@
-import pytest, yaml
+import pytest, yaml, polars as pl
 from passyunk.parser import PassyunkParser
 from functools import partial
-from utils.parse_address import parse_address, combine_fields, find_address_fields
+from utils.parse_address import (
+    parse_address,
+    combine_fields,
+    find_address_fields,
+    load_zips,
+    flag_non_philly_address,
+)
 
 p = PassyunkParser()
 parse = partial(parse_address, p)
+zips = load_zips("./mapping/zip_codes.csv")
 
 
 def write_yaml(tmp_path, data, name="config.yml"):
@@ -84,6 +91,36 @@ def test_parse_real_address():
     assert is_philly_addr == True
 
 
+def test_flag_non_philly_returns_false():
+    city = "Philadelphia"
+    state = "PA"
+    result = flag_non_philly_address(zips, city=city, state=state)
+
+    assert result == False
+
+
+def test_flag_non_philly_returns_true():
+    city = "Denver"
+    state = "CO"
+    result = flag_non_philly_address(zips, city=city, state=state)
+
+    assert result == True
+
+
+def test_flag_non_philly_returns_false_zip_only():
+    zip = 19125
+    result = flag_non_philly_address(zips, zip=zip)
+
+    assert result == False
+
+
+def test_flag_non_philly_returns_true_zip_only():
+    zip = 80126
+    result = flag_non_philly_address(zips, zip=zip)
+
+    assert result == True
+
+
 def test_parse_non_philly_address():
     parsed = parse("123 fake st")
 
@@ -91,7 +128,7 @@ def test_parse_non_philly_address():
     is_addr = parsed["is_addr"]
     is_philly_addr = parsed["is_philly_addr"]
 
-    assert addr == "123 FAKE ST"
+    assert addr == "123 fake st"
     assert is_addr == True
     assert is_philly_addr == False
 
@@ -102,7 +139,7 @@ def test_parse_non_address():
     is_addr = parsed["is_addr"]
     is_philly_addr = parsed["is_philly_addr"]
 
-    assert addr == "NOT AN ADDRESS"
+    assert addr == "not an address"
     assert is_addr == False
     assert is_philly_addr == False
 

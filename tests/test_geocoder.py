@@ -30,7 +30,12 @@ def test_build_enrichment_fields_returns_fields():
 
 def test_build_enrichment_fields_errors_if_invalid_field():
     config = {
-        "enrichment_fields": ["coordinates", "latitude", "longitude", "census_block_2020"]
+        "enrichment_fields": [
+            "coordinates",
+            "latitude",
+            "longitude",
+            "census_block_2020",
+        ]
     }
 
     with pytest.raises(ValueError):

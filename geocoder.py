@@ -2,6 +2,7 @@ import yaml, polars as pl, requests, click
 from datetime import datetime
 from utils.parse_address import find_address_fields, parse_address
 from utils.ais_lookup import throttle_ais_lookup
+from utils.tomtom_lookup import throttle_tomtom_lookup
 from mapping.ais_properties_fields import fields
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
@@ -57,7 +58,9 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     """
     ais_enrichment_fields = config["enrichment_fields"]
 
-    invalid_fields = [item for item in ais_enrichment_fields if item not in fields.keys()]
+    invalid_fields = [
+        item for item in ais_enrichment_fields if item not in fields.keys()
+    ]
 
     if invalid_fields:
         to_print = ", ".join(field for field in invalid_fields)
@@ -162,6 +165,33 @@ def enrich_with_ais(
 
     return added
 
+def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
+    
+    new_cols = pl.Struct([
+        pl.Field("output_address", pl.String),
+        pl.Field("geocode_lat", pl.String),
+        pl.Field("geocode_lon", pl.String)
+    ])
+
+    field_names = [f.name for f in new_cols.fields]
+
+    with requests.Session() as sess:
+        added = (
+            to_add.with_columns(
+                pl.col("output_address")
+                .map_elements(
+                    lambda a: throttle_tomtom_lookup(sess, a),
+                    return_dtype=new_cols,
+                )
+                .alias("temp_struct")
+            )
+            .with_columns(
+                *[pl.col("temp_struct").struct.field(n).alias(n) for n in field_names]
+            )
+            .drop("temp_struct")
+        )
+
+    return added
 
 @click.command()
 @click.option(
@@ -218,9 +248,13 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     # Generate the names of columns to add for both the AIS API
     # and the address file
-    ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(config)
+    ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
+        config
+    )
 
-    joined_lf = add_address_file_fields(geo_filepath, lf, address_file_enrichment_fields)
+    joined_lf = add_address_file_fields(
+        geo_filepath, lf, address_file_enrichment_fields
+    )
 
     # Split out fields that did not match the address file
     # and attempt to match them with the AIS API
@@ -233,11 +267,27 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     ais_enriched = enrich_with_ais(config, needs_geo, ais_enrichment_fields)
 
-    rejoined = (
+    ais_rejoined = (
         pl.concat([has_geo, ais_enriched])
+        .sort("__geocode_idx__")
+    )
+
+    # -------------- Check Match Failures Against TomTom ------------------ #
+
+    has_geo, needs_geo = split_geos(ais_rejoined)
+    
+    current_time = get_current_time()
+    print(f"Adding fields from TomTom at {get_current_time()}")
+
+    tomtom_enriched = enrich_with_tomtom(needs_geo)
+
+    rejoined = (
+        pl.concat([has_geo, tomtom_enriched])
         .sort("__geocode_idx__")
         .drop(["__geocode_idx__", "joined_address"])
     )
+
+    # -------------------- Save Output File ---------------------- #
 
     in_path = PurePath(filepath)
 
@@ -252,7 +302,6 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     current_time = get_current_time()
     print(f"Enrichment complete at {current_time}.")
-
 
 if __name__ == "__main__":
     process_csv()

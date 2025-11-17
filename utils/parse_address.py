@@ -1,5 +1,56 @@
-import yaml, re
+import yaml, re, polars as pl
 from typing import List
+
+
+def load_zips(zip_filepath):
+    zip_df = pl.read_csv(zip_filepath)
+    zips = zip_df["zip_code"].to_list()
+    return zips
+
+
+def infer_city_state_field(config_path) -> dict:
+    """
+    Args:
+        config_path (str): The path of the config file.
+
+    Returns dict: A dict mapping city and state fields
+    """
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    full_addr = config.get("full_address_field")
+
+    if full_addr:
+        return {"full_address": full_addr}
+
+    addr_fields = config.get("address_fields") or {}
+
+    return {
+        "city": addr_fields.get("city", None),
+        "state": addr_fields.get("state", None),
+        "zip": addr_fields.get("zip", None),
+    }
+
+
+def flag_non_philly_address(
+    philly_zips: list, city: str = None, state: str = None, zip: str = None
+):
+
+    if city:
+        city = city.lower()
+    if state:
+        state = state.lower()
+
+    if (
+        city not in ("philadelphia", None)
+        or state not in ("pennsylvania", "pa", None)
+        or zip not in (*philly_zips, None)
+    ):
+
+        return True
+
+    return False
 
 
 def find_address_fields(config_path) -> List[str]:
@@ -60,10 +111,11 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     """
     parsed = parser.parse(address)["components"]
 
-    output_address = parsed["output_address"]
     is_addr = parsed["address"]["isaddr"]
     # If address matches to a street code, it is a philly address
     is_philly_addr = bool(parsed["street"]["street_code"])
+
+    output_address = parsed["output_address"] if is_philly_addr else address
 
     return {
         "output_address": output_address,
