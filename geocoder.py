@@ -1,6 +1,6 @@
 import yaml, polars as pl, requests, click
 from datetime import datetime
-from utils.parse_address import find_address_fields, parse_address
+from utils.parse_address import find_address_fields, parse_address, find_zip_field
 from utils.ais_lookup import throttle_ais_lookup
 from utils.tomtom_lookup import throttle_tomtom_lookup
 from mapping.ais_properties_fields import fields
@@ -33,14 +33,16 @@ def parse_with_passyunk_parser(lf: pl.LazyFrame) -> pl.LazyFrame:
             pl.Field("output_address", pl.String),
             pl.Field("is_addr", pl.Boolean),
             pl.Field("is_philly_addr", pl.Boolean),
+            pl.Field("is_multiple_match", pl.Boolean),
+            pl.Field("match_type", pl.String),
         ]
     )
 
     lf = lf.with_columns(
         pl.col("joined_address")
         .map_elements(lambda s: parse_address(p, s), return_dtype=new_cols)
-        .alias("temp_struct")
-    ).unnest("temp_struct")
+        .alias("passyunk_struct")
+    ).unnest("passyunk_struct")
 
     return lf
 
@@ -120,18 +122,6 @@ def split_geos(data: pl.LazyFrame):
 def enrich_with_ais(
     config: dict, to_add: pl.LazyFrame, enrichment_fields: list
 ) -> pl.LazyFrame:
-    """
-    Adds user-specified fields to a polars lazyframe from AIS.
-
-    Args:
-        config: A user config dict
-        to_add: A polars lazyframe to be enriched
-        enrichment_fields: A list of enrichment fields specified by the user
-
-    Returns:
-        An enriched polars lazyframe
-    """
-
     new_cols = pl.Struct(
         [
             pl.Field("output_address", pl.String),
@@ -139,39 +129,65 @@ def enrich_with_ais(
             pl.Field("is_philly_addr", pl.Boolean),
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String),
+            pl.Field("is_multiple_match", pl.Boolean),
+            pl.Field("match_type", pl.String),
             *[pl.Field(field, pl.String) for field in enrichment_fields],
         ]
     )
 
     API_KEY = config.get("AIS_API_KEY")
-
     field_names = [f.name for f in new_cols.fields]
 
     with requests.Session() as sess:
+        addr_cfg = config.get("address_fields") or {}
+        zip_field = addr_cfg.get("zip")
+
+        # Don't include zip field if full address field is specified
+        if zip_field and not config.get("full_address_field"):
+            struct_expr = pl.struct(["output_address", zip_field]).map_elements(
+                lambda s: throttle_ais_lookup(
+                    sess,
+                    API_KEY,
+                    s["output_address"],
+                    s[zip_field],
+                    enrichment_fields,
+                ),
+                return_dtype=new_cols,
+            )
+        else:
+            struct_expr = pl.col("output_address").map_elements(
+                lambda a: throttle_ais_lookup(
+                    sess,
+                    API_KEY,
+                    a,
+                    None,
+                    enrichment_fields,
+                ),
+                return_dtype=new_cols,
+            )
+
+        tmp_name = "ais_struct"
+
         added = (
-            to_add.with_columns(
-                pl.col("output_address")
-                .map_elements(
-                    lambda a: throttle_ais_lookup(sess, API_KEY, a, enrichment_fields),
-                    return_dtype=new_cols,
-                )
-                .alias("temp_struct")
-            )
+            to_add.with_columns(struct_expr.alias(tmp_name))
             .with_columns(
-                *[pl.col("temp_struct").struct.field(n).alias(n) for n in field_names]
+                *[pl.col(tmp_name).struct.field(n).alias(n) for n in field_names]
             )
-            .drop("temp_struct")
+            .drop(tmp_name)
         )
 
     return added
 
 def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
-    
-    new_cols = pl.Struct([
-        pl.Field("output_address", pl.String),
-        pl.Field("geocode_lat", pl.String),
-        pl.Field("geocode_lon", pl.String)
-    ])
+
+    new_cols = pl.Struct(
+        [
+            pl.Field("output_address", pl.String),
+            pl.Field("geocode_lat", pl.String),
+            pl.Field("geocode_lon", pl.String),
+            pl.Field("match_type", pl.String)
+        ]
+    )
 
     field_names = [f.name for f in new_cols.fields]
 
@@ -183,15 +199,16 @@ def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
                     lambda a: throttle_tomtom_lookup(sess, a),
                     return_dtype=new_cols,
                 )
-                .alias("temp_struct")
+                .alias("tomtom_struct")
             )
             .with_columns(
-                *[pl.col("temp_struct").struct.field(n).alias(n) for n in field_names]
+                *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
             )
-            .drop("temp_struct")
+            .drop("tomtom_struct")
         )
 
     return added
+
 
 @click.command()
 @click.option(
@@ -267,15 +284,12 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     ais_enriched = enrich_with_ais(config, needs_geo, ais_enrichment_fields)
 
-    ais_rejoined = (
-        pl.concat([has_geo, ais_enriched])
-        .sort("__geocode_idx__")
-    )
+    ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
     # -------------- Check Match Failures Against TomTom ------------------ #
 
     has_geo, needs_geo = split_geos(ais_rejoined)
-    
+
     current_time = get_current_time()
     print(f"Adding fields from TomTom at {get_current_time()}")
 
@@ -302,6 +316,7 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     current_time = get_current_time()
     print(f"Enrichment complete at {current_time}.")
+
 
 if __name__ == "__main__":
     process_csv()

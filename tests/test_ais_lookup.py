@@ -29,9 +29,14 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
             {
                 "features": [
                     {
-                        "properties": {"street_address": "1234 MARKET ST"},
+                        "properties": {"street_address": "1234 MARKET ST", "zip_code": "19107"},
+                        "geometry": {"coordinates": [-75.16, 39.95]},
+                    },
+                    {
+                        "properties": {"street_address": "1234 MARKET ST", "zip_code": "11111"},
                         "geometry": {"coordinates": [-75.16, 39.95]},
                     }
+
                 ]
             },
             200,
@@ -40,7 +45,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
 
-    result = ais_lookup.ais_lookup(sess, "1234", "1234 mkt st", [])
+    result = ais_lookup.ais_lookup(sess, "1234", "1234 mkt st", "19107", [])
 
     assert created["url"] == "https://api.phila.gov/ais/v1/search/1234 mkt st"
     assert created["params"] == {"gatekeeperKey": "1234"}
@@ -50,6 +55,8 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
+        "match_type": "ais",
+        "is_multiple_match": False
     }
 
 
@@ -82,12 +89,14 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
     sess = FakeSession()
 
     address = "123 fake st"
-    result = ais_lookup.ais_lookup(sess, "1234", address, [])
-    
+    result = ais_lookup.ais_lookup(sess, "1234", address, zip=None, enrichment_fields=[])
+
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
         "is_addr": False,
         "is_philly_addr": False,
         "output_address": "123 fake st",
+        "is_multiple_match": False,
+        "match_type": None
     }

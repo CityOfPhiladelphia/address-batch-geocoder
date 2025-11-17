@@ -1,26 +1,40 @@
 import utils.tomtom_lookup as tomtom_lookup
 
-json_response_match =  {'spatialReference': {'wkid': 4326, 'latestWkid': 4326},
-    'candidates': [{'address': '1234 Market St, Philadelphia, Pennsylvania, 19107',
-    'location': {'x': -75.16047189802985, 'y': 39.951918251135154},
-    'score': 100,
-    'attributes': {},
-    'extent': {'xmin': -75.16147189802986,
-        'ymin': 39.95091825113516,
-        'xmax': -75.15947189802985,
-        'ymax': 39.95291825113515}},
-    {'address': '1234 Market St, Gloucester City, New Jersey, 08030',
-    'location': {'x': -75.11192847164241, 'y': 39.88775918851947},
-    'score': 97.26,
-    'attributes': {},
-    'extent': {'xmin': -75.11292847164242,
-        'ymin': 39.88675918851947,
-        'xmax': -75.11092847164241,
-        'ymax': 39.888759188519465}}
-    ]}
+json_response_match = {
+    "spatialReference": {"wkid": 4326, "latestWkid": 4326},
+    "candidates": [
+        {
+            "address": "1234 Market St, Philadelphia, Pennsylvania, 19107",
+            "location": {"x": -75.16047189802985, "y": 39.951918251135154},
+            "score": 100,
+            "attributes": {},
+            "extent": {
+                "xmin": -75.16147189802986,
+                "ymin": 39.95091825113516,
+                "xmax": -75.15947189802985,
+                "ymax": 39.95291825113515,
+            },
+        },
+        {
+            "address": "1234 Market St, Gloucester City, New Jersey, 08030",
+            "location": {"x": -75.11192847164241, "y": 39.88775918851947},
+            "score": 97.26,
+            "attributes": {},
+            "extent": {
+                "xmin": -75.11292847164242,
+                "ymin": 39.88675918851947,
+                "xmax": -75.11092847164241,
+                "ymax": 39.888759188519465,
+            },
+        },
+    ],
+}
 
-json_response_nonmatch = {'spatialReference': {'wkid': 4326, 'latestWkid': 4326},
-    'candidates': []}
+json_response_nonmatch = {
+    "spatialReference": {"wkid": 4326, "latestWkid": 4326},
+    "candidates": [],
+}
+
 
 def test_false_address_returns_none_if_bad_address(monkeypatch):
 
@@ -43,9 +57,7 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
             raise AssertionError("Should be patched")
 
     def fake_get(self, url, params=None, timeout=None, **kwargs):
-        return FakeResponse(
-            {}, 404
-        )
+        return FakeResponse({}, 404)
 
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
@@ -56,4 +68,5 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
         "geocode_lat": None,
         "geocode_lon": None,
         "output_address": "",
+        "match_type": None,
     }
