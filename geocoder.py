@@ -100,6 +100,13 @@ def add_address_file_fields(
         addresses, how="left", left_on="output_address", right_on="street_address"
     ).rename(rename_mapping)
 
+    joined_lf = joined_lf.with_columns(
+        pl.when(pl.col("geocode_lat").is_not_null())
+        .then(pl.lit("address_file"))
+        .otherwise("match_type")
+        .alias("match_type")
+    )
+
     return joined_lf
 
 
