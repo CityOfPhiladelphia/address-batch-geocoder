@@ -27,10 +27,7 @@ def tomtom_lookup(sess: requests.Session, address: str) -> dict:
     tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
 
     # Need to specify json format, HTML by default
-    params = {
-        'Address': address,
-        'f': 'pjson'
-    }
+    params = {"Address": address, "f": "pjson"}
 
     response = sess.get(tomtom_url, params=params, timeout=10)
 
@@ -42,7 +39,7 @@ def tomtom_lookup(sess: requests.Session, address: str) -> dict:
     out_data = {}
     if response.status_code == 200:
         # TomTom returns an empty list if no addresses match
-        if response.json()['candidates']:
+        if response.json()["candidates"]:
             # First response should be most probable match
             r_json = response.json()["candidates"][0]
             address = r_json.get("address", "")
@@ -57,21 +54,21 @@ def tomtom_lookup(sess: requests.Session, address: str) -> dict:
             out_data["output_address"] = address
             out_data["geocode_lat"] = str(lat)
             out_data["geocode_lon"] = str(lon)
+            out_data["match_type"] = "tomtom"
 
             return out_data
 
     out_data["output_address"] = ""
     out_data["geocode_lat"] = None
     out_data["geocode_lon"] = None
+    out_data["match_type"] = None
 
     return out_data
 
-def throttle_tomtom_lookup(
-    sess: requests.Session, address: str
-) -> dict:
+
+def throttle_tomtom_lookup(sess: requests.Session, address: str) -> dict:
     """
     Helper function to throttle the number of API requests to 10 per second.
     """
     limiter.wait()
     return tomtom_lookup(sess, address)
-

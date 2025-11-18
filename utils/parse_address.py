@@ -53,6 +53,23 @@ def flag_non_philly_address(
     return False
 
 
+def find_zip_field(config_path) -> str:
+    """
+    Identifies the name of the zip code field.
+    """
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    addr_fields = config.get("address_fields") or {}
+    zip_field = addr_fields.get("zip", "")
+
+    if zip_field:
+        return zip_field
+
+    return None
+
+
 def find_address_fields(config_path) -> List[str]:
     """
     Parses which address fields to consider in the input file based on
@@ -121,4 +138,6 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
         "output_address": output_address,
         "is_addr": is_addr,
         "is_philly_addr": is_philly_addr,
+        "is_multiple_match": False,
+        "match_type": None,
     }
