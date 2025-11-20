@@ -1,35 +1,24 @@
 import pytest, yaml, polars as pl
 from passyunk.parser import PassyunkParser
 from functools import partial
+from utils.zips import ZIPS
 from utils.parse_address import (
     parse_address,
     combine_fields,
     find_address_fields,
-    load_zips,
     flag_non_philly_address,
+    tag_full_address
 )
 
 p = PassyunkParser()
 parse = partial(parse_address, p)
-zips = load_zips("./mapping/zip_codes.csv")
+zips = ZIPS
 
 
 def write_yaml(tmp_path, data, name="config.yml"):
     p = tmp_path / name
     p.write_text(yaml.safe_dump(data, sort_keys=False))
     return str(p)
-
-
-def test_uses_full_address_when_present(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path,
-        {
-            "full_address_field": "street_address",
-            "address_fields": {"street": "addr_st", "city": "addr_city"},
-        },
-    )
-
-    assert find_address_fields(cfg_path) == ["street_address"]
 
 
 def test_falls_back_to_component_fields(tmp_path):
@@ -66,7 +55,7 @@ def test_raises_if_street_null(tmp_path):
         },
     )
 
-    with pytest.raises(ValueError, match="street"):
+    with pytest.raises(ValueError, match="is not specified"):
         find_address_fields(cfg_path)
 
 
@@ -75,7 +64,7 @@ def test_raises_when_both_null(tmp_path):
         tmp_path, {"full_address_field": None, "address_fields": {"street": None}}
     )
 
-    with pytest.raises(ValueError, match="street"):
+    with pytest.raises(ValueError, match="specified in the config file"):
         find_address_fields(cfg_path)
 
 
@@ -92,31 +81,46 @@ def test_parse_real_address():
 
 
 def test_flag_non_philly_returns_false():
-    city = "Philadelphia"
-    state = "PA"
-    result = flag_non_philly_address(zips, city=city, state=state)
+
+    address_data = {
+        'city': "Philadelphia",
+        'state': 'PA'
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == False
 
 
 def test_flag_non_philly_returns_true():
-    city = "Denver"
-    state = "CO"
-    result = flag_non_philly_address(zips, city=city, state=state)
+
+    address_data = {
+        'city': "Denver",
+        'state': "CO",
+        'zip': None
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == True
 
 
 def test_flag_non_philly_returns_false_zip_only():
-    zip = 19125
-    result = flag_non_philly_address(zips, zip=zip)
+    address_data = {
+        'zip': 19125
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == False
 
 
 def test_flag_non_philly_returns_true_zip_only():
-    zip = 80126
-    result = flag_non_philly_address(zips, zip=zip)
+    address_data = {
+        'zip': 80126
+    }
+    
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == True
 
@@ -162,3 +166,17 @@ def test_combine_fields_handles_single_field():
     result = combine_fields(fields, record)
 
     assert result == "1234 market st"
+
+def test_tag_full_address_tags_correctly():
+
+    address = '1234 Market Street Philadelphia PA 19107'
+
+    tagged = tag_full_address(address)
+
+    expected = {
+        'city': 'Philadelphia',
+        'state': 'PA',
+        'zip': '19107'
+    }
+
+    assert expected == tagged

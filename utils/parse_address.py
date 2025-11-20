@@ -1,4 +1,4 @@
-import yaml, re, polars as pl
+import yaml, re, polars as pl, usaddress, sys
 from typing import List
 
 
@@ -32,43 +32,84 @@ def infer_city_state_field(config_path) -> dict:
         "zip": addr_fields.get("zip", None),
     }
 
+def tag_full_address(address: str):
 
-def flag_non_philly_address(
-    philly_zips: list, city: str = None, state: str = None, zip: str = None
-):
+    tagged, _ = usaddress.tag(address)
+
+    city = tagged.get('PlaceName', None)
+    state = tagged.get('StateName', None)
+    zip_code = tagged.get('ZipCode', None)
+
+    return {
+        'city': city,
+        'state': state,
+        'zip': zip_code
+    }
+
+def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
+    """
+    Given a dictionary that contains city, state, zip,
+    determine whether or not an address is in Philly.
+
+    Returns:
+        True if non philly address, false otherwise.
+    """
+    city = address_data.get("city", None)
+    state = address_data.get("state", None)
+    zip_code = address_data.get("zip", None)
 
     if city:
         city = city.lower()
     if state:
         state = state.lower()
+    
+    # Handle null values for zip code slicing
+    if zip_code is None:
+        zip_code = ''
 
     if (
-        city not in ("philadelphia", None)
+        city not in ("philadelphia", "phila", None)
         or state not in ("pennsylvania", "pa", None)
-        or zip not in (*philly_zips, None)
+        or zip_code[:5] not in (*philly_zips, '')
     ):
 
         return True
 
     return False
 
-
-def find_zip_field(config_path) -> str:
+def is_non_philly_from_full_address(
+        address: str,
+        *,
+        philly_zips: list
+) -> bool:
     """
-    Identifies the name of the zip code field.
+    Helper function that allows the flag_non_philly_address
+    to be run as a mapped function within polars.
     """
+    if address is None:
+        return False
+    
+    address_data = tag_full_address(address)
 
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+    return flag_non_philly_address(address_data, philly_zips)
 
-    addr_fields = config.get("address_fields") or {}
-    zip_field = addr_fields.get("zip", "")
+def is_non_philly_from_split_address(
+        address_data: dict,
+        *,
+        zips: list,
+) -> bool:
+    """
+    Address_data: A row from a polars struct with keys
+    'city', 'state', 'zip'. 
 
-    if zip_field:
-        return zip_field
+    Zips are frozen with partial.
 
-    return None
-
+    Returns true if the address is non-philly.
+    """
+    if address_data is None:
+        return False
+    
+    return flag_non_philly_address(address_data, zips)
 
 def find_address_fields(config_path) -> List[str]:
     """
@@ -86,10 +127,38 @@ def find_address_fields(config_path) -> List[str]:
         config = yaml.safe_load(f)
 
     full_addr = config.get("full_address_field")
-    if full_addr:
-        return [full_addr]
 
-    addr_fields = config.get("address_fields") or {}
+    addr_fields = config.get("address_fields")
+
+    # If user has not specified an address field, raise
+    if not full_addr and not any(addr_fields.values()):
+        raise ValueError("An address field or address fields must be specified "
+        "in the config file.")
+
+    # Handle cases where user has specified both a full address field
+    # and separate address fields.
+    resp = ''
+
+    if full_addr and addr_fields:
+
+        print("You have specified both a full address and separate" \
+                "address fields in the config file. " \
+                "Press 1 to use the full address, " \
+                "2 to use the address fields, or Q to quit.")
+        
+        while (resp.lower() not in ["1","2","q","quit"]):
+            if full_addr and addr_fields:
+                resp = input("Specify which fields to use: ")
+        
+            if resp == "1":
+                return [full_addr]
+
+            elif resp == "2":
+                break
+
+            else:
+                print("Exiting program...")
+                sys.exit()
 
     if not addr_fields.get("street"):
         raise ValueError(

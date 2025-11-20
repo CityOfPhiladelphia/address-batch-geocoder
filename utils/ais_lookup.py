@@ -1,5 +1,9 @@
 import requests, time
 from retrying import retry
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# Suppress the InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class RateLimiter:
@@ -30,7 +34,7 @@ class RateLimiter:
         self._last_time = now
 
 
-limiter = RateLimiter(10)
+limiter = RateLimiter(5)
 
 
 def tiebreak(response: dict, zip) -> dict:
@@ -103,12 +107,12 @@ def ais_lookup(
         if len(response.json()["features"]) > 1:
             r_json = tiebreak(response, zip)
 
-            # If no matches are found, return
+            # If tiebreak fails, return
             # null values for most fields.
             if not r_json:
                 out_data["output_address"] = None
                 out_data["is_addr"] = False
-                out_data["is_philly_addr"] = False
+                out_data["is_philly_addr"] = True
                 out_data["geocode_lat"] = None
                 out_data["geocode_lon"] = None
                 out_data["is_multiple_match"] = True
