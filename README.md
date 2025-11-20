@@ -166,6 +166,15 @@ To run one test within a file:
 python3 pytest tests/test_parser.py::test_parse_address
 ```
 
+## Packaging
+After making updates to this program, it will need to be packaged
+and distributed. Here are the steps to do so:
+
+Make sure uv is installed (this is a package manager):
+`pip install uv`
+
+Then run: `uv pip compile pyproject.toml --output-file requirements.txt --generate-hashes`
+
 ## Enrichment Fields
 | `Field` |
 | --- |

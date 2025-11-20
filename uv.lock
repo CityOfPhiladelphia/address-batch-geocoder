@@ -591,8 +591,8 @@ wheels = [
 
 [[package]]
 name = "passyunk"
-version = "2.38.0"
-source = { git = "https://github.com/CityOfPhiladelphia/passyunk#015ba145739e001815fc8c26e6be09a046c15d40" }
+version = "2.39.0"
+source = { git = "https://github.com/CityOfPhiladelphia/passyunk#f0f5fe9d5d732c31df37227c43ea4908192d782f" }
 dependencies = [
     { name = "fuzzywuzzy" },
     { name = "importlib-metadata" },
