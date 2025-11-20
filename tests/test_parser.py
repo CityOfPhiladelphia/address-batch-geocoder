@@ -7,6 +7,7 @@ from utils.parse_address import (
     find_address_fields,
     load_zips,
     flag_non_philly_address,
+    tag_full_address
 )
 
 p = PassyunkParser()
@@ -92,31 +93,46 @@ def test_parse_real_address():
 
 
 def test_flag_non_philly_returns_false():
-    city = "Philadelphia"
-    state = "PA"
-    result = flag_non_philly_address(zips, city=city, state=state)
+
+    address_data = {
+        'city': "Philadelphia",
+        'state': 'PA'
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == False
 
 
 def test_flag_non_philly_returns_true():
-    city = "Denver"
-    state = "CO"
-    result = flag_non_philly_address(zips, city=city, state=state)
+
+    address_data = {
+        'city': "Denver",
+        'state': "CO",
+        'zip': None
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == True
 
 
 def test_flag_non_philly_returns_false_zip_only():
-    zip = 19125
-    result = flag_non_philly_address(zips, zip=zip)
+    address_data = {
+        'zip': 19125
+    }
+
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == False
 
 
 def test_flag_non_philly_returns_true_zip_only():
-    zip = 80126
-    result = flag_non_philly_address(zips, zip=zip)
+    address_data = {
+        'zip': 80126
+    }
+    
+    result = flag_non_philly_address(address_data, zips)
 
     assert result == True
 
@@ -162,3 +178,17 @@ def test_combine_fields_handles_single_field():
     result = combine_fields(fields, record)
 
     assert result == "1234 market st"
+
+def test_tag_full_address_tags_correctly():
+
+    address = '1234 Market Street Philadelphia PA 19107'
+
+    tagged = tag_full_address(address)
+
+    expected = {
+        'city': 'Philadelphia',
+        'state': 'PA',
+        'zip': '19107'
+    }
+
+    assert expected == tagged

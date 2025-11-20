@@ -1,17 +1,75 @@
-import yaml, polars as pl, requests, click
+import yaml, polars as pl, requests, click, usaddress
 from datetime import datetime
-from utils.parse_address import find_address_fields, parse_address, find_zip_field
+from functools import partial
+from utils.parse_address import find_address_fields, parse_address, infer_city_state_field, is_non_philly_from_full_address, is_non_philly_from_split_address
 from utils.ais_lookup import throttle_ais_lookup
 from utils.tomtom_lookup import throttle_tomtom_lookup
+from utils.zips import ZIPS
 from mapping.ais_properties_fields import fields
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
-
 
 def get_current_time():
     current_datetime = datetime.now()
     return current_datetime.strftime("%H:%M:%S")
 
+def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
+    """
+    Given a polars LazyFrame, splits into two lazy frames:
+    One for addresses located in Philadelphia, one for addresses
+    not located in Philadelphia.
+
+    Returns:
+        (philly_lf, non_philly_lf)
+    """
+
+    fields = infer_city_state_field(config_path)
+    
+    # If we are using full address field, we need to look up
+    # against us-address.
+    full_address_field = fields.get('full_address', None)
+
+    if full_address_field:
+        non_philly_fn = partial(
+            is_non_philly_from_full_address,
+            philly_zips=ZIPS
+        )
+
+        flagged = lf.with_columns(
+            pl.col(full_address_field)
+            .map_elements(non_philly_fn, return_dtype=pl.Boolean)
+            .alias("is_non_philly")
+        )
+
+    # Otherwise, get address columns from config
+    else:
+        city_col = fields.get("city", None)
+        state_col = fields.get("state")
+        zip_col = fields.get("zip")
+        
+        address_struct = pl.struct(
+            [
+                (pl.col(city_col) if city_col else pl.lit(None, dtype=pl.Utf8)).alias("city"),
+                (pl.col(state_col) if state_col else pl.lit(None, dtype=pl.Utf8)).alias("state"),
+                (pl.col(zip_col) if zip_col else pl.lit(None, dtype=pl.Utf8)).alias("zip"),
+            ]
+        )
+
+        non_philly_fn = partial(
+            is_non_philly_from_split_address,
+            zips=ZIPS
+        )
+
+        flagged = lf.with_columns(
+            address_struct
+            .map_elements(non_philly_fn, return_dtype=pl.Boolean)
+            .alias("is_non_philly")
+        )
+    
+    non_philly_lf = flagged.filter(pl.col("is_non_philly"))
+    philly_lf = flagged.filter(~pl.col("is_non_philly"))
+          
+    return philly_lf, non_philly_lf
 
 def parse_with_passyunk_parser(lf: pl.LazyFrame) -> pl.LazyFrame:
     """
@@ -249,16 +307,24 @@ def process_csv(config_path) -> pl.LazyFrame:
         raise ValueError(
             "A filepath for the geography file must be" "specified in the config."
         )
-    # ---------------- Join Addresses to Address File -------------------#
-
-    current_time = get_current_time()
-    print(f"Joining addresses to address file at {current_time}.")
-
+   
     # Determine which fields in the file are the address fields
     address_fields = find_address_fields(config_path)
 
     lf = pl.scan_csv(filepath, row_index_name="__geocode_idx__")
 
+    # Check if there are invalid address fields specified
+    file_cols = lf.columns
+    diff = [field for field in address_fields if field not in file_cols]
+
+    if diff:
+        raise ValueError("The following fields specified in the config"
+                         f"file are not present in the input file: {diff}")
+    
+    # ---------------- Join Addresses to Address File -------------------#
+
+    current_time = get_current_time()
+    print(f"Joining addresses to address file at {current_time}.")
     # Concatenate address fields, strip extra spaces
     lf = lf.with_columns(
         pl.concat_str(
@@ -270,6 +336,11 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     lf = parse_with_passyunk_parser(lf)
 
+    # ---------------- Split out Non Philly Addresses -------------------#
+    current_time = get_current_time()
+    print(f"Identifying non-Philadelphia addresses at {current_time}.")
+    philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+
     # Generate the names of columns to add for both the AIS API
     # and the address file
     ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
@@ -277,7 +348,7 @@ def process_csv(config_path) -> pl.LazyFrame:
     )
 
     joined_lf = add_address_file_fields(
-        geo_filepath, lf, address_file_enrichment_fields
+        geo_filepath, philly_lf, address_file_enrichment_fields
     )
 
     # Split out fields that did not match the address file
@@ -300,12 +371,20 @@ def process_csv(config_path) -> pl.LazyFrame:
     current_time = get_current_time()
     print(f"Adding fields from TomTom at {get_current_time()}")
 
+    # Rejoin the addresses marked as non-philly for tomtom search
+    needs_geo = (
+        pl.concat([non_philly_lf, needs_geo], how="diagonal")
+        .sort("__geocode_idx__")
+    )
+
+    needs_geo.sink_csv('data/needs_geo.csv')
+
     tomtom_enriched = enrich_with_tomtom(needs_geo)
 
     rejoined = (
         pl.concat([has_geo, tomtom_enriched])
         .sort("__geocode_idx__")
-        .drop(["__geocode_idx__", "joined_address"])
+        .drop(["__geocode_idx__", "joined_address", "is_non_philly"])
     )
 
     # -------------------- Save Output File ---------------------- #
