@@ -39,7 +39,7 @@ def tomtom_lookup(sess: requests.Session, address: str) -> dict:
     out_data = {}
     if response.status_code == 200:
         # TomTom returns an empty list if no addresses match
-        if response.json()["candidates"]:
+        if response.json().get("candidates"):
             # First response should be most probable match
             r_json = response.json()["candidates"][0]
             address = r_json.get("address", "")

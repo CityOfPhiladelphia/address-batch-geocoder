@@ -62,11 +62,15 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
         city = city.lower()
     if state:
         state = state.lower()
+    
+    # Handle null values for zip code slicing
+    if zip_code is None:
+        zip_code = ''
 
     if (
-        city not in ("philadelphia", None)
+        city not in ("philadelphia", "phila", None)
         or state not in ("pennsylvania", "pa", None)
-        or zip_code not in (*philly_zips, None)
+        or zip_code[:5] not in (*philly_zips, '')
     ):
 
         return True

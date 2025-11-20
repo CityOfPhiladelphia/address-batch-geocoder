@@ -1,6 +1,8 @@
-import yaml, polars as pl, requests, click, usaddress
+import yaml, polars as pl, requests, click, os
+from pathlib import Path
 from datetime import datetime
 from functools import partial
+from utils.encoder import detect_file_encoding, recode_to_utf8
 from utils.parse_address import find_address_fields, parse_address, infer_city_state_field, is_non_philly_from_full_address, is_non_philly_from_split_address
 from utils.ais_lookup import throttle_ais_lookup
 from utils.tomtom_lookup import throttle_tomtom_lookup
@@ -8,6 +10,7 @@ from utils.zips import ZIPS
 from mapping.ais_properties_fields import fields
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
+
 
 def get_current_time():
     current_datetime = datetime.now()
@@ -258,8 +261,10 @@ def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
 
     with requests.Session() as sess:
         added = (
+            # Use the joined address for tomtom, as passyunk parser strips
+            # state, city information
             to_add.with_columns(
-                pl.col("output_address")
+                pl.col("joined_address")
                 .map_elements(
                     lambda a: throttle_tomtom_lookup(sess, a),
                     return_dtype=new_cols,
@@ -311,10 +316,28 @@ def process_csv(config_path) -> pl.LazyFrame:
     # Determine which fields in the file are the address fields
     address_fields = find_address_fields(config_path)
 
-    lf = pl.scan_csv(filepath, row_index_name="__geocode_idx__")
+    # Detect input file encoding
+
+    encoding = detect_file_encoding(filepath)
+
+    # If encoding is not UTF-8, recode it
+    utf8_filepath = ''
+    if encoding != 'UTF-8':
+
+        print(f"Converting file encoding from {encoding} to UTF-8")
+        utf8_filepath = Path(filepath).with_suffix(Path(filepath).suffix + ".utf8")
+        recode_to_utf8(filepath, utf8_filepath, encoding)
+        filepath = utf8_filepath
+
+    # infer schema = False infers everything as a string. Otherwise, polars
+    # will attempt to infer zip codes like 19114-3409 as an int
+    lf = pl.scan_csv(filepath, 
+                     row_index_name="__geocode_idx__", 
+                     infer_schema=False,
+                     encoding='utf8-lossy')
 
     # Check if there are invalid address fields specified
-    file_cols = lf.columns
+    file_cols = lf.collect_schema().names()
     diff = [field for field in address_fields if field not in file_cols]
 
     if diff:
@@ -340,6 +363,8 @@ def process_csv(config_path) -> pl.LazyFrame:
     current_time = get_current_time()
     print(f"Identifying non-Philadelphia addresses at {current_time}.")
     philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+
+    non_philly_lf.sink_csv('data/non_philly_addresses.csv')
 
     # Generate the names of columns to add for both the AIS API
     # and the address file
@@ -402,6 +427,9 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     current_time = get_current_time()
     print(f"Enrichment complete at {current_time}.")
+
+    if utf8_filepath:
+        os.remove(utf8_filepath)
 
 
 if __name__ == "__main__":

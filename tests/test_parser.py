@@ -1,18 +1,18 @@
 import pytest, yaml, polars as pl
 from passyunk.parser import PassyunkParser
 from functools import partial
+from utils.zips import ZIPS
 from utils.parse_address import (
     parse_address,
     combine_fields,
     find_address_fields,
-    load_zips,
     flag_non_philly_address,
     tag_full_address
 )
 
 p = PassyunkParser()
 parse = partial(parse_address, p)
-zips = load_zips("./mapping/zip_codes.csv")
+zips = ZIPS
 
 
 def write_yaml(tmp_path, data, name="config.yml"):
