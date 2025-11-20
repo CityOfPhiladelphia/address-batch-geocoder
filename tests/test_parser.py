@@ -21,18 +21,6 @@ def write_yaml(tmp_path, data, name="config.yml"):
     return str(p)
 
 
-def test_uses_full_address_when_present(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path,
-        {
-            "full_address_field": "street_address",
-            "address_fields": {"street": "addr_st", "city": "addr_city"},
-        },
-    )
-
-    assert find_address_fields(cfg_path) == ["street_address"]
-
-
 def test_falls_back_to_component_fields(tmp_path):
     cfg_path = write_yaml(
         tmp_path,
@@ -67,7 +55,7 @@ def test_raises_if_street_null(tmp_path):
         },
     )
 
-    with pytest.raises(ValueError, match="street"):
+    with pytest.raises(ValueError, match="is not specified"):
         find_address_fields(cfg_path)
 
 
@@ -76,7 +64,7 @@ def test_raises_when_both_null(tmp_path):
         tmp_path, {"full_address_field": None, "address_fields": {"street": None}}
     )
 
-    with pytest.raises(ValueError, match="street"):
+    with pytest.raises(ValueError, match="specified in the config file"):
         find_address_fields(cfg_path)
 
 

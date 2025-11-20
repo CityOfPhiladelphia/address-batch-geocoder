@@ -64,9 +64,9 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
         state = state.lower()
 
     if (
-        (city not in ("philadelphia", None)
-        or state not in ("pennsylvania", "pa", None))
-        and zip_code not in (*philly_zips, None)
+        city not in ("philadelphia", None)
+        or state not in ("pennsylvania", "pa", None)
+        or zip_code not in (*philly_zips, None)
     ):
 
         return True
@@ -127,7 +127,7 @@ def find_address_fields(config_path) -> List[str]:
     addr_fields = config.get("address_fields")
 
     # If user has not specified an address field, raise
-    if not full_addr and not all(addr_fields.values()):
+    if not full_addr and not any(addr_fields.values()):
         raise ValueError("An address field or address fields must be specified "
         "in the config file.")
 
@@ -156,12 +156,12 @@ def find_address_fields(config_path) -> List[str]:
                 print("Exiting program...")
                 sys.exit()
 
-        if not addr_fields.get("street"):
-            raise ValueError(
-                "When full address field is not specified, "
-                "address_fields must include a non-null value for "
-                "street."
-            )
+    if not addr_fields.get("street"):
+        raise ValueError(
+            "When full address field is not specified, "
+            "address_fields must include a non-null value for "
+            "street."
+        )
 
     fields = [v for v in addr_fields.values() if v is not None]
     return fields
