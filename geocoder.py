@@ -400,8 +400,6 @@ def process_csv(config_path) -> pl.LazyFrame:
         .sort("__geocode_idx__")
     )
 
-    needs_geo.sink_csv('data/needs_geo.csv')
-
     tomtom_enriched = enrich_with_tomtom(needs_geo)
 
     rejoined = (
