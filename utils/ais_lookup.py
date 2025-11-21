@@ -6,7 +6,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 # Suppress the InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-AIS_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
+AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 
 
 def tiebreak(response: dict, zip) -> dict:
