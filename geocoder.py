@@ -364,8 +364,6 @@ def process_csv(config_path) -> pl.LazyFrame:
     print(f"Identifying non-Philadelphia addresses at {current_time}.")
     philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
 
-    non_philly_lf.sink_csv('data/non_philly_addresses.csv')
-
     # Generate the names of columns to add for both the AIS API
     # and the address file
     ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(

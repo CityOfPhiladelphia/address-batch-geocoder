@@ -14,10 +14,6 @@ click==8.1.8 ; python_full_version < '3.10'
     # via
     #   address-geocoder
     #   black
-click==8.3.0 ; python_full_version >= '3.10'
-    # via
-    #   address-geocoder
-    #   black
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
@@ -39,13 +35,7 @@ importlib-metadata==7.0.0
     # via passyunk
 iniconfig==2.1.0 ; python_full_version < '3.10'
     # via pytest
-iniconfig==2.3.0 ; python_full_version >= '3.10'
-    # via pytest
 ipython==8.18.1 ; python_full_version < '3.10'
-    # via address-geocoder
-ipython==8.37.0 ; python_full_version == '3.10.*'
-    # via address-geocoder
-ipython==9.6.0 ; python_full_version >= '3.11'
     # via address-geocoder
 ipython-pygments-lexers==1.1.1 ; python_full_version >= '3.11'
     # via ipython
@@ -63,15 +53,13 @@ packaging==25.0
     #   pytest
 parso==0.8.5
     # via jedi
-passyunk @ git+https://github.com/CityOfPhiladelphia/passyunk@f0f5fe9d5d732c31df37227c43ea4908192d782f
+passyunk>=2.0.0
     # via address-geocoder
 pathspec==0.12.1
     # via black
 pexpect==4.9.0 ; (python_full_version < '3.10' and sys_platform == 'emscripten') or (sys_platform != 'emscripten' and sys_platform != 'win32')
     # via ipython
 platformdirs==4.4.0 ; python_full_version < '3.10'
-    # via black
-platformdirs==4.5.0 ; python_full_version >= '3.10'
     # via black
 pluggy==1.6.0
     # via pytest
@@ -89,8 +77,6 @@ pure-eval==0.2.3
     # via stack-data
 pyarrow==21.0.0 ; python_full_version < '3.10'
     # via address-geocoder
-pyarrow==22.0.0 ; python_full_version >= '3.10'
-    # via address-geocoder
 pygments==2.19.2
     # via
     #   ipython
@@ -105,8 +91,6 @@ pytokens==0.2.0
 pyyaml==6.0.3
     # via address-geocoder
 rapidfuzz==3.13.0 ; python_full_version < '3.10'
-    # via levenshtein
-rapidfuzz==3.14.1 ; python_full_version >= '3.10'
     # via levenshtein
 requests==2.32.5
     # via passyunk
