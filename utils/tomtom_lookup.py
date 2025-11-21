@@ -1,8 +1,8 @@
 import requests
-from utils.ais_lookup import RateLimiter
+from .rate_limiter import RateLimiter
 from retrying import retry
 
-limiter = RateLimiter(10)
+TOMTOM_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
 
 
 # Code adapted from Alex Waldman and Roland MacDavid
@@ -70,5 +70,5 @@ def throttle_tomtom_lookup(sess: requests.Session, address: str) -> dict:
     """
     Helper function to throttle the number of API requests to 10 per second.
     """
-    limiter.wait()
+    TOMTOM_RATE_LIMITER.wait()
     return tomtom_lookup(sess, address)

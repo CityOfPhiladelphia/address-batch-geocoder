@@ -1,40 +1,12 @@
 import requests, time
 from retrying import retry
+from .rate_limiter import RateLimiter
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 # Suppress the InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-
-class RateLimiter:
-    """
-    A class to handle rate limiting of an API. Faster than
-    calling time.sleep() because it takes into account response
-    lag from the API.
-
-    Example usage:
-    limiter = RateLimiter(10)
-
-    limiter.wait()
-    (api call)
-    """
-
-    def __init__(self, rps: int):
-        self.rate = 1.0 / rps
-        self._last_time = 0.0
-
-    def wait(self):
-        now = time.perf_counter()
-        remaining = self.rate - (now - self._last_time)
-
-        if remaining > 0:
-            time.sleep(remaining)
-            now = time.perf_counter()
-
-        self._last_time = now
-
-
-limiter = RateLimiter(5)
+AIS_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
 
 
 def tiebreak(response: dict, zip) -> dict:
@@ -181,5 +153,5 @@ def throttle_ais_lookup(
     """
     Helper function to throttle the number of API requests to 10 per second.
     """
-    limiter.wait()
+    AIS_RATE_LIMITER.wait()
     return ais_lookup(sess, api_key, address, zip, enrichment_fields)
