@@ -169,8 +169,8 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         "geocode_lat": None,
         "geocode_lon": None,
         "is_addr": False,
-        "is_philly_addr": False,
-        "output_address": None,
+        "is_philly_addr": True,
+        "output_address": "1234 mkt st",
         "match_type": "ais",
         "is_multiple_match": True
     }

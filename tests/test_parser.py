@@ -107,7 +107,7 @@ def test_flag_non_philly_returns_true():
 
 def test_flag_non_philly_returns_false_zip_only():
     address_data = {
-        'zip': 19125
+        'zip': '19125'
     }
 
     result = flag_non_philly_address(address_data, zips)
@@ -117,7 +117,7 @@ def test_flag_non_philly_returns_false_zip_only():
 
 def test_flag_non_philly_returns_true_zip_only():
     address_data = {
-        'zip': 80126
+        'zip': '80126'
     }
     
     result = flag_non_philly_address(address_data, zips)

@@ -62,11 +62,13 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
 
-    result = tomtom_lookup.tomtom_lookup(sess, "1234 Fake St")
+    result = tomtom_lookup.tomtom_lookup(sess, ['1111'], "1234 Fake St", "1234 FAKE ST")
 
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
-        "output_address": "",
+        "is_addr": False,
+        "is_philly_addr": False,
+        "output_address": "1234 FAKE ST",
         "match_type": None,
     }

@@ -71,6 +71,8 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     
     non_philly_lf = flagged.filter(pl.col("is_non_philly"))
     philly_lf = flagged.filter(~pl.col("is_non_philly"))
+
+    non_philly_lf.sink_csv("data/non_philly_addresses.csv")
           
     return philly_lf, non_philly_lf
 
@@ -253,7 +255,9 @@ def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
             pl.Field("output_address", pl.String),
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String),
-            pl.Field("match_type", pl.String)
+            pl.Field("match_type", pl.String),
+            pl.Field("is_addr", pl.Boolean),
+            pl.Field("is_philly_addr", pl.Boolean)
         ]
     )
 
@@ -264,9 +268,14 @@ def enrich_with_tomtom(to_add: pl.LazyFrame) -> pl.LazyFrame:
             # Use the joined address for tomtom, as passyunk parser strips
             # state, city information
             to_add.with_columns(
-                pl.col("joined_address")
+                pl.struct(["joined_address", "output_address"])
                 .map_elements(
-                    lambda a: throttle_tomtom_lookup(sess, a),
+                    lambda cols: throttle_tomtom_lookup(
+                        sess,
+                        ZIPS,
+                        cols["joined_address"], 
+                        cols["output_address"]
+                        ),
                     return_dtype=new_cols,
                 )
                 .alias("tomtom_struct")
@@ -354,6 +363,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             [pl.col(field).fill_null("") for field in address_fields], separator=" "
         )
         .str.replace_all(r"\s+", " ")
+        .str.strip_chars()
         .alias("joined_address")
     )
 
@@ -390,6 +400,8 @@ def process_csv(config_path) -> pl.LazyFrame:
     # -------------- Check Match Failures Against TomTom ------------------ #
 
     has_geo, needs_geo = split_geos(ais_rejoined)
+
+    needs_geo.sink_csv("data/needs_geo.csv")
 
     current_time = get_current_time()
     print(f"Adding fields from TomTom at {get_current_time()}")

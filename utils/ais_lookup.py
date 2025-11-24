@@ -71,7 +71,7 @@ def ais_lookup(
     if response.status_code >= 500:
         raise Exception("5xx response")
     elif response.status_code == 429:
-        raise Exception("429 response")
+        raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
     if response.status_code == 200:
@@ -82,7 +82,9 @@ def ais_lookup(
             # If tiebreak fails, return
             # null values for most fields.
             if not r_json:
-                out_data["output_address"] = None
+                r_json = response.json()
+                normalized_addr = r_json.get("normalized", "")
+                out_data["output_address"] = normalized_addr if normalized_addr else address
                 out_data["is_addr"] = False
                 out_data["is_philly_addr"] = True
                 out_data["geocode_lat"] = None
@@ -98,7 +100,7 @@ def ais_lookup(
         else:
             r_json = response.json()["features"][0]
 
-        address = r_json.get("properties", "").get("street_address", "")
+        out_address = r_json.get("properties", "").get("street_address", "")
 
         try:
             lon, lat = r_json["geometry"]["coordinates"]
@@ -106,7 +108,7 @@ def ais_lookup(
         except KeyError:
             lon, lat = ""
 
-        out_data["output_address"] = address
+        out_data["output_address"] = out_address if out_address else address 
         out_data["is_addr"] = True
         out_data["is_philly_addr"] = True
         out_data["geocode_lat"] = str(lat)

@@ -59,23 +59,39 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
     zip_code = address_data.get("zip", None)
 
     if city:
-        city = city.lower()
+        city = city.lower().strip()
     if state:
-        state = state.lower()
+        state = state.lower().strip()
+    # If there's any whitespace in the zip code, it will mess up slicing
+    # to get only ZIP5.
+    if zip_code:
+        zip_code = zip_code.strip()
     
-    # Handle null values for zip code slicing
+    philly_names = {"philadelphia", "phila", "philly"}
+    pa_names = {"pennsylvania", "pa", "penn"}
+
+    # Case 1: If Philly city and state, treat as Philly regardless
+    # of zip:
+    if city in philly_names and state in pa_names:
+        return False # in Philly
+
+    # Case 2: If city is non philly or state is non PA, not in Philly:
+    if city is not None and city not in philly_names:
+        return True # non-Philly
+    if state is not None and state not in pa_names:
+        return True # non-Philly
+    
+    # Case 3: Use ZIP when city or state are missing, assume Philly
+    # if Zip is none:
     if zip_code is None:
-        zip_code = ''
-
-    if (
-        city not in ("philadelphia", "phila", None)
-        or state not in ("pennsylvania", "pa", None)
-        or zip_code[:5] not in (*philly_zips, '')
-    ):
-
+        return False # Philly address
+    
+    if zip_code[:5] in philly_zips:
+        return False # Philly address
+    
+    # City/state are null, zip not in philly
+    else:
         return True
-
-    return False
 
 def is_non_philly_from_full_address(
         address: str,
