@@ -2,18 +2,18 @@ import yaml, polars as pl, requests, click, os
 from pathlib import Path
 from datetime import datetime
 from functools import partial
-from utils.encoder import detect_file_encoding, recode_to_utf8
-from utils.parse_address import (
+from .utils.encoder import detect_file_encoding, recode_to_utf8
+from .utils.parse_address import (
     find_address_fields,
     parse_address,
     infer_city_state_field,
     is_non_philly_from_full_address,
     is_non_philly_from_split_address,
 )
-from utils.ais_lookup import throttle_ais_lookup
-from utils.tomtom_lookup import throttle_tomtom_lookup
-from utils.zips import ZIPS
-from mapping.ais_properties_fields import POSSIBLE_FIELDS
+from .utils.ais_lookup import throttle_ais_lookup
+from .utils.tomtom_lookup import throttle_tomtom_lookup
+from .utils.zips import ZIPS
+from .mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
 
@@ -494,6 +494,9 @@ def process_csv(config_path) -> pl.LazyFrame:
     if utf8_filepath:
         os.remove(utf8_filepath)
 
+def main() -> None:
+    # uvx / console entry point
+    process_csv.main(standalone_mode=True)
 
 if __name__ == "__main__":
-    process_csv()
+    main()
