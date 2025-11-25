@@ -1,4 +1,4 @@
-fields = {
+POSSIBLE_FIELDS = {
     "address_low": "address",
     "address_low_suffix": "address_suffix",
     "address_low_frac": "address_fractional",

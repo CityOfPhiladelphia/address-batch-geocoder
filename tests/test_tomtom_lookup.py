@@ -1,4 +1,7 @@
 import utils.tomtom_lookup as tomtom_lookup
+from passyunk.parser import PassyunkParser
+
+p = PassyunkParser()
 
 json_response_match = {
     "spatialReference": {"wkid": 4326, "latestWkid": 4326},
@@ -62,11 +65,15 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
 
-    result = tomtom_lookup.tomtom_lookup(sess, "1234 Fake St")
+    result = tomtom_lookup.tomtom_lookup(
+        sess, p, ["1111"], "1234 Fake St", "1234 FAKE ST"
+    )
 
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
-        "output_address": "",
+        "is_addr": False,
+        "is_philly_addr": False,
+        "output_address": "1234 FAKE ST",
         "match_type": None,
     }

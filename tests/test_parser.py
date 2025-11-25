@@ -7,7 +7,7 @@ from utils.parse_address import (
     combine_fields,
     find_address_fields,
     flag_non_philly_address,
-    tag_full_address
+    tag_full_address,
 )
 
 p = PassyunkParser()
@@ -30,7 +30,7 @@ def test_falls_back_to_component_fields(tmp_path):
         },
     )
 
-    assert find_address_fields(cfg_path) == ["addr_st", "addr_city"]
+    assert find_address_fields(cfg_path) == {"street": "addr_st", "city": "addr_city"}
 
 
 def test_raises_if_street_missing(tmp_path):
@@ -82,10 +82,7 @@ def test_parse_real_address():
 
 def test_flag_non_philly_returns_false():
 
-    address_data = {
-        'city': "Philadelphia",
-        'state': 'PA'
-    }
+    address_data = {"city": "Philadelphia", "state": "PA"}
 
     result = flag_non_philly_address(address_data, zips)
 
@@ -94,11 +91,7 @@ def test_flag_non_philly_returns_false():
 
 def test_flag_non_philly_returns_true():
 
-    address_data = {
-        'city': "Denver",
-        'state': "CO",
-        'zip': None
-    }
+    address_data = {"city": "Denver", "state": "CO", "zip": None}
 
     result = flag_non_philly_address(address_data, zips)
 
@@ -106,9 +99,7 @@ def test_flag_non_philly_returns_true():
 
 
 def test_flag_non_philly_returns_false_zip_only():
-    address_data = {
-        'zip': 19125
-    }
+    address_data = {"zip": "19125"}
 
     result = flag_non_philly_address(address_data, zips)
 
@@ -116,10 +107,8 @@ def test_flag_non_philly_returns_false_zip_only():
 
 
 def test_flag_non_philly_returns_true_zip_only():
-    address_data = {
-        'zip': 80126
-    }
-    
+    address_data = {"zip": "80126"}
+
     result = flag_non_philly_address(address_data, zips)
 
     assert result == True
@@ -167,16 +156,13 @@ def test_combine_fields_handles_single_field():
 
     assert result == "1234 market st"
 
+
 def test_tag_full_address_tags_correctly():
 
-    address = '1234 Market Street Philadelphia PA 19107'
+    address = "1234 Market Street Philadelphia PA 19107"
 
     tagged = tag_full_address(address)
 
-    expected = {
-        'city': 'Philadelphia',
-        'state': 'PA',
-        'zip': '19107'
-    }
+    expected = {"city": "Philadelphia", "state": "PA", "zip": "19107"}
 
     assert expected == tagged

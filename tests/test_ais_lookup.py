@@ -29,14 +29,19 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
             {
                 "features": [
                     {
-                        "properties": {"street_address": "1234 MARKET ST", "zip_code": "19107"},
+                        "properties": {
+                            "street_address": "1234 MARKET ST",
+                            "zip_code": "19107",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
                     },
                     {
-                        "properties": {"street_address": "1234 MARKET ST", "zip_code": "11111"},
+                        "properties": {
+                            "street_address": "1234 MARKET ST",
+                            "zip_code": "11111",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
-                    }
-
+                    },
                 ]
             },
             200,
@@ -56,8 +61,9 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
         "match_type": "ais",
-        "is_multiple_match": False
+        "is_multiple_match": False,
     }
+
 
 def test_ais_lookup_tiebreaks(monkeypatch):
     created = {}
@@ -87,14 +93,19 @@ def test_ais_lookup_tiebreaks(monkeypatch):
             {
                 "features": [
                     {
-                        "properties": {"street_address": "1234 N MARKET ST", "zip_code": "19107"},
+                        "properties": {
+                            "street_address": "1234 N MARKET ST",
+                            "zip_code": "19107",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
                     },
                     {
-                        "properties": {"street_address": "1234 S MARKET ST", "zip_code": "11111"},
+                        "properties": {
+                            "street_address": "1234 S MARKET ST",
+                            "zip_code": "11111",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
-                    }
-
+                    },
                 ]
             },
             200,
@@ -114,8 +125,9 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         "is_philly_addr": True,
         "output_address": "1234 N MARKET ST",
         "match_type": "ais",
-        "is_multiple_match": False
+        "is_multiple_match": False,
     }
+
 
 def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
     created = {}
@@ -145,14 +157,19 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
             {
                 "features": [
                     {
-                        "properties": {"street_address": "1234 N MARKET ST", "zip_code": "22222"},
+                        "properties": {
+                            "street_address": "1234 N MARKET ST",
+                            "zip_code": "22222",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
                     },
                     {
-                        "properties": {"street_address": "1234 S MARKET ST", "zip_code": "11111"},
+                        "properties": {
+                            "street_address": "1234 S MARKET ST",
+                            "zip_code": "11111",
+                        },
                         "geometry": {"coordinates": [-75.16, 39.95]},
-                    }
-
+                    },
                 ]
             },
             200,
@@ -169,10 +186,10 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         "geocode_lat": None,
         "geocode_lon": None,
         "is_addr": False,
-        "is_philly_addr": False,
-        "output_address": None,
+        "is_philly_addr": True,
+        "output_address": "1234 mkt st",
         "match_type": "ais",
-        "is_multiple_match": True
+        "is_multiple_match": True,
     }
 
 
@@ -205,7 +222,9 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
     sess = FakeSession()
 
     address = "123 fake st"
-    result = ais_lookup.ais_lookup(sess, "1234", address, zip=None, enrichment_fields=[])
+    result = ais_lookup.ais_lookup(
+        sess, "1234", address, zip=None, enrichment_fields=[]
+    )
 
     assert result == {
         "geocode_lat": None,
@@ -214,5 +233,5 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
         "is_philly_addr": False,
         "output_address": "123 fake st",
         "is_multiple_match": False,
-        "match_type": None
+        "match_type": None,
     }

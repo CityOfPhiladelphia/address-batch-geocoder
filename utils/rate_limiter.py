@@ -2,6 +2,7 @@ from collections import deque
 import threading
 import time
 
+
 class RateLimiter:
     """
     Thread-safe rate limiter. Polars is multithreaded by default,
@@ -23,11 +24,11 @@ class RateLimiter:
         while True:
             with self._lock:
                 now = time.monotonic()
-            
+
                 # If first call is before the window, we can drop it
                 while self._calls and self._calls[0] <= now - self.period:
                     self._calls.popleft()
-                
+
                 # We can make a call if there are fewer
                 # than max calls in the queue
                 if len(self._calls) < self.max_calls:
@@ -36,9 +37,8 @@ class RateLimiter:
 
                 oldest = self._calls[0]
                 sleep_for = self.period - (now - oldest)
-            
+
             if sleep_for > 0:
                 time.sleep(sleep_for)
             else:
                 time.sleep(0.001)
-
