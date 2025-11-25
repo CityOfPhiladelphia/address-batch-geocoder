@@ -15,20 +15,27 @@ def tiebreak(response: dict, zip) -> dict:
     If no zip code is provided, return None and a flag that indicates a
     duplicate match.
 
+    Args:
+        response (dict): An AIS API response
+        zip (str): The zip code present on the input data. Used
+        to check API responses against.
+
     Returns:
         A dict with the zipcode-matched record, or if no match, None.
     """
 
     candidates = []
     for candidate in response.json()["features"]:
-        
+
+        # If the AIS API zip code matches the zip code on the
+        # incoming data, this record is a potential match
         if candidate["properties"].get("zip_code", "") == zip:
             candidates.append(candidate)
 
     if len(candidates) == 1:
         return candidates[0]
 
-    # If multiple candidates have zip code,
+    # If multiple candidates have same zip code,
     # or no candidates have zip code,
     # we cannot tie break. Return None.
     return None
@@ -56,6 +63,7 @@ def ais_lookup(
         sess (requests Session object): A requests library session object
         api_key (str): An AIS api key
         address (str): The address to query
+        zip (str): The zip code associated with the address, if present
         enrichment_fields (list): The fields to add from AIS
 
     Returns:
@@ -69,13 +77,17 @@ def ais_lookup(
     response = sess.get(ais_url, params=params, timeout=10, verify=False)
 
     if response.status_code >= 500:
-        raise Exception("5xx response")
+        raise Exception("5xx response. There may be a problem with the" "AIS API.")
     elif response.status_code == 429:
         raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
+    # If status code is 200, that means API has found a match.
+    # API will return a 404 if no match
     if response.status_code == 200:
 
+        # If r_json is longer than 1, multiple matches
+        # were returned and we need to tiebreak.
         if len(response.json()["features"]) > 1:
             r_json = tiebreak(response, zip)
 
@@ -84,7 +96,9 @@ def ais_lookup(
             if not r_json:
                 r_json = response.json()
                 normalized_addr = r_json.get("normalized", "")
-                out_data["output_address"] = normalized_addr if normalized_addr else address
+                out_data["output_address"] = (
+                    normalized_addr if normalized_addr else address
+                )
                 out_data["is_addr"] = False
                 out_data["is_philly_addr"] = True
                 out_data["geocode_lat"] = None
@@ -97,6 +111,7 @@ def ais_lookup(
 
                 return out_data
 
+        # If r_json is not longer than 1, no need to tiebreak
         else:
             r_json = response.json()["features"][0]
 
@@ -108,7 +123,7 @@ def ais_lookup(
         except KeyError:
             lon, lat = ""
 
-        out_data["output_address"] = out_address if out_address else address 
+        out_data["output_address"] = out_address if out_address else address
         out_data["is_addr"] = True
         out_data["is_philly_addr"] = True
         out_data["geocode_lat"] = str(lat)
