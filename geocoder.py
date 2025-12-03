@@ -452,6 +452,8 @@ def process_csv(config_path) -> pl.LazyFrame:
         config, needs_geo, uses_full_address, ais_enrichment_fields
     )
 
+    ais_enriched.sink_csv('data/ais_enriched.csv')
+
     ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
     # -------------- Check Match Failures Against TomTom ------------------ #
