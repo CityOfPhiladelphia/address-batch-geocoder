@@ -1,4 +1,4 @@
-import yaml, polars as pl, requests, click, os
+import yaml, polars as pl, requests, click, os, tempfile
 from pathlib import Path
 from datetime import datetime
 from functools import partial
@@ -383,128 +383,137 @@ def process_csv(config_path) -> pl.LazyFrame:
     address_fields = find_address_fields(config_path)
 
     # Detect input file encoding
-
     encoding = detect_file_encoding(filepath)
+
+    # Save original filepath for output naming
+    original_filepath = filepath
 
     # If encoding is not UTF-8, recode it
     utf8_filepath = ""
     if encoding != "UTF-8":
-
         print(f"Converting file encoding from {encoding} to UTF-8")
-        utf8_filepath = Path(filepath).with_suffix(Path(filepath).suffix + ".utf8")
+
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.csv',
+            delete=False,
+            encoding='utf-8'
+        ) as temp_file:
+            utf8_filepath = temp_file.name
+
         recode_to_utf8(filepath, utf8_filepath, encoding)
         filepath = utf8_filepath
 
-    # infer schema = False infers everything as a string. Otherwise, polars
-    # will attempt to infer zip codes like 19114-3409 as an int
-    lf = pl.scan_csv(
-        filepath,
-        row_index_name="__geocode_idx__",
-        infer_schema=False,
-        encoding="utf8-lossy",
-    )
-
-    # Check if there are invalid address fields specified
-    file_cols = lf.collect_schema().names()
-    address_fields_list = [field for field in address_fields.values() if field]
-    diff = [field for field in address_fields_list if field not in file_cols]
-
-    if diff:
-        raise ValueError(
-            "The following fields specified in the config"
-            f"file are not present in the input file: {diff}"
+    try:
+        # infer schema = False infers everything as a string. Otherwise, polars
+        # will attempt to infer zip codes like 19114-3409 as an int
+        lf = pl.scan_csv(
+            filepath,
+            row_index_name="__geocode_idx__",
+            infer_schema=False,
+            encoding="utf8-lossy",
         )
 
-    # ---------------- Join Addresses to Address File -------------------#
+        # Check if there are invalid address fields specified
+        file_cols = lf.collect_schema().names()
+        address_fields_list = [field for field in address_fields.values() if field]
+        diff = [field for field in address_fields_list if field not in file_cols]
 
-    current_time = get_current_time()
-    print(f"Joining addresses to address file at {current_time}.")
-    # Concatenate address fields, strip extra spaces
-    lf = lf.with_columns(
-        pl.concat_str(
-            [pl.col(field).fill_null("") for field in address_fields_list],
-            separator=" ",
+        if diff:
+            raise ValueError(
+                "The following fields specified in the config"
+                f"file are not present in the input file: {diff}"
+            )
+
+        # ---------------- Join Addresses to Address File -------------------#
+
+        current_time = get_current_time()
+        print(f"Joining addresses to address file at {current_time}.")
+        # Concatenate address fields, strip extra spaces
+        lf = lf.with_columns(
+            pl.concat_str(
+                [pl.col(field).fill_null("") for field in address_fields_list],
+                separator=" ",
+            )
+            .str.replace_all(r"\s+", " ")
+            .str.strip_chars()
+            .alias("joined_address")
         )
-        .str.replace_all(r"\s+", " ")
-        .str.strip_chars()
-        .alias("joined_address")
-    )
 
-    parser = PassyunkParser()
-    lf = parse_with_passyunk_parser(parser, lf)
+        parser = PassyunkParser()
+        lf = parse_with_passyunk_parser(parser, lf)
 
-    # ---------------- Split out Non Philly Addresses -------------------#
-    current_time = get_current_time()
-    print(f"Identifying non-Philadelphia addresses at {current_time}.")
-    philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+        # ---------------- Split out Non Philly Addresses -------------------#
+        current_time = get_current_time()
+        print(f"Identifying non-Philadelphia addresses at {current_time}.")
+        philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
 
-    # Generate the names of columns to add for both the AIS API
-    # and the address file
-    ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
-        config
-    )
+        # Generate the names of columns to add for both the AIS API
+        # and the address file
+        ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
+            config
+        )
 
-    joined_lf = add_address_file_fields(
-        geo_filepath, philly_lf, address_file_enrichment_fields
-    )
+        joined_lf = add_address_file_fields(
+            geo_filepath, philly_lf, address_file_enrichment_fields
+        )
 
-    # Split out fields that did not match the address file
-    # and attempt to match them with the AIS API
+        # Split out fields that did not match the address file
+        # and attempt to match them with the AIS API
 
-    # -------------------------- Add Fields from AIS ------------------ #
-    current_time = get_current_time()
-    print(f"Adding fields from AIS at {get_current_time()}")
+        # -------------------------- Add Fields from AIS ------------------ #
+        current_time = get_current_time()
+        print(f"Adding fields from AIS at {get_current_time()}")
 
-    has_geo, needs_geo = split_geos(joined_lf)
+        has_geo, needs_geo = split_geos(joined_lf)
 
-    uses_full_address = bool(address_fields.get("full_address"))
-    ais_enriched = enrich_with_ais(
-        config, needs_geo, uses_full_address, ais_enrichment_fields
-    )
+        uses_full_address = bool(address_fields.get("full_address"))
+        ais_enriched = enrich_with_ais(
+            config, needs_geo, uses_full_address, ais_enrichment_fields
+        )
 
-    ais_enriched.sink_csv('data/ais_enriched.csv')
+        ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
-    ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
+        # -------------- Check Match Failures Against TomTom ------------------ #
 
-    # -------------- Check Match Failures Against TomTom ------------------ #
+        has_geo, needs_geo = split_geos(ais_rejoined)
 
-    has_geo, needs_geo = split_geos(ais_rejoined)
+        current_time = get_current_time()
+        print(f"Adding fields from TomTom at {get_current_time()}")
 
-    current_time = get_current_time()
-    print(f"Adding fields from TomTom at {get_current_time()}")
+        # Rejoin the addresses marked as non-philly for tomtom search
+        # at the beginning of the process
+        needs_geo = pl.concat([non_philly_lf, needs_geo], how="diagonal").sort(
+            "__geocode_idx__"
+        )
 
-    # Rejoin the addresses marked as non-philly for tomtom search
-    # at the beginning of the process
-    needs_geo = pl.concat([non_philly_lf, needs_geo], how="diagonal").sort(
-        "__geocode_idx__"
-    )
+        tomtom_enriched = enrich_with_tomtom(parser, needs_geo)
 
-    tomtom_enriched = enrich_with_tomtom(parser, needs_geo)
+        rejoined = (
+            pl.concat([has_geo, tomtom_enriched])
+            .sort("__geocode_idx__")
+            .drop(["__geocode_idx__", "joined_address", "is_non_philly"])
+        )
 
-    rejoined = (
-        pl.concat([has_geo, tomtom_enriched])
-        .sort("__geocode_idx__")
-        .drop(["__geocode_idx__", "joined_address", "is_non_philly"])
-    )
+        # -------------------- Save Output File ---------------------- #
 
-    # -------------------- Save Output File ---------------------- #
+        in_path = PurePath(original_filepath)
 
-    in_path = PurePath(filepath)
+        # If filepath has multiple suffixes, remove them
+        stem = in_path.name.replace("".join(in_path.suffixes), "")
 
-    # If filepath has multiple suffixes, remove them
-    stem = in_path.name.replace("".join(in_path.suffixes), "")
+        out_path = f"{stem}_enriched.csv"
 
-    out_path = f"{stem}_enriched.csv"
+        out_path = str(in_path.parent / out_path)
 
-    out_path = str(in_path.parent / out_path)
+        rejoined.sink_csv(out_path)
 
-    rejoined.sink_csv(out_path)
+        current_time = get_current_time()
+        print(f"Enrichment complete at {current_time}.")
 
-    current_time = get_current_time()
-    print(f"Enrichment complete at {current_time}.")
-
-    if utf8_filepath:
-        os.remove(utf8_filepath)
+    finally:
+        if utf8_filepath:
+            os.remove(utf8_filepath)
 
 
 if __name__ == "__main__":

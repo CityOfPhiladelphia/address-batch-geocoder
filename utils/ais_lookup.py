@@ -175,7 +175,6 @@ def ais_lookup(
             coord_lookup_results = make_coordinate_lookups(
                 sess, coord_pairs, api_key)
             tiebroken_address = tiebreak_coordinate_lookups(coord_lookup_results, zip)
-            print(tiebroken_address)
 
         # If tiebreak fails, return
         # null values for most fields.
