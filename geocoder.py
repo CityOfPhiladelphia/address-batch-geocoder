@@ -173,6 +173,16 @@ def add_address_file_fields(
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
+    # Check which enrichment fields would conflict with existing columns
+    existing_cols = input_data.collect_schema().names()
+    enrichment_col_names = [key for key, value in POSSIBLE_FIELDS.items() if value in address_fields]
+    conflicts = [field for field in enrichment_col_names if field in existing_cols]
+    
+    # Rename conflicting input columns to _left
+    if conflicts:
+        rename_input = {field: field + "_left" for field in conflicts}
+        input_data = input_data.rename(rename_input)
+    
     rename_mapping = {
         value: key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
     }

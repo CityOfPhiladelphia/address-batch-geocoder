@@ -121,6 +121,8 @@ enrichment_fields:
   - census_block_2020
 ```
 
+Note that if one of the input fields has a column the same name as 
+
 6. You're now ready to run the geocoder:
 
 ```
@@ -167,6 +169,9 @@ python3 pytest tests/test_parser.py::test_parse_address
 ```
 
 ## Enrichment Fields
+Note that if any of the fields in the input file have the same name as
+an enrichment field, the incoming input file field will be renamed to have the _left suffix.
+
 | `Field` |
 | --- |
 |`address_low`|
