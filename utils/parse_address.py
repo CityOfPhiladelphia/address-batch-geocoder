@@ -48,7 +48,7 @@ def tag_full_address(address: str):
     return {"city": city, "state": state, "zip": zip_code}
 
 
-def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
+def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
     """
     Given a dictionary that contains city, state, zip,
     determine whether or not an address is in Philly.
@@ -59,7 +59,8 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
         philly_zips (list): A list of all valid Philadelphia zip codes
 
     Returns:
-        True if non philly address, false otherwise.
+        Dict with 'is_non_philly' (bool) and 'is_undefined' (bool).
+        is_undefined=True when we can't determine location with certainty.
     """
     city = address_data.get("city")
     state = address_data.get("state")
@@ -80,28 +81,29 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> bool:
     # Case 1: If Philly city and state, treat as Philly regardless
     # of zip:
     if city in philly_names and state in pa_names:
-        return False  # in Philly
+        return {"is_non_philly": False, "is_undefined": False}  # in Philly
 
     # Case 2: If city is non philly or state is non PA, not in Philly:
     if city is not None and city not in philly_names:
-        return True  # non-Philly
+        return {"is_non_philly": True, "is_undefined": False}
+    
     if state is not None and state not in pa_names:
-        return True  # non-Philly
+        return {"is_non_philly": True, "is_undefined": False}  # non-Philly
 
     # Case 3: Use ZIP when city or state are missing, assume Philly
     # if Zip is none:
     if zip_code is None:
-        return False  # Philly address
+        return {"is_non_philly": False, "is_undefined": True}  # Philly address
 
     if zip_code[:5] in philly_zips:
-        return False  # Philly address
+        return {"is_non_philly": False, "is_undefined": False}  # Philly address
 
     # City/state are null, zip not in philly
     else:
-        return True
+        return {"is_non_philly": True, "is_undefined": False}
 
 
-def is_non_philly_from_full_address(address: str, *, philly_zips: list) -> bool:
+def is_non_philly_from_full_address(address: str, *, philly_zips: list) -> dict:
     """
     Helper function that allows the flag_non_philly_address
     to be run as a mapped function within polars.
@@ -111,10 +113,10 @@ def is_non_philly_from_full_address(address: str, *, philly_zips: list) -> bool:
         philly_zips (list)
 
     Returns:
-        bool: True if the address is not within Philly.
+        dict: {'is_non_philly': bool, 'is_undefined': bool}
     """
     if address is None:
-        return False
+        return {"is_non_philly": False, "is_undefined": True}
 
     address_data = tag_full_address(address)
 
@@ -132,10 +134,10 @@ def is_non_philly_from_split_address(
 
     Zips are frozen with partial.
 
-    Returns true if the address is non-philly.
+    Returns dict with is_non_philly and is_undefined flags.
     """
     if address_data is None:
-        return False
+        return {"is_non_philly": False, "is_undefined": True}
 
     return flag_non_philly_address(address_data, zips)
 
@@ -232,13 +234,21 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     and a boolean value indicating if the address is a valid Philadelphia
     address.
     """
-    parsed = parser.parse(address)["components"]
+    prsd = parser.parse(address)
+    parsed = prsd["components"]
 
-    is_addr = parsed["address"]["isaddr"]
+    has_street_code = False
+    for street in ('street', 'street_2'):
+        sc = parsed.get(street, {}).get('street_code')
+        if sc:
+            has_street_code = True
+            break 
+        
     # If address matches to a street code, it is a philly address
-    is_philly_addr = bool(parsed["street"]["street_code"])
-
-    output_address = parsed["output_address"] if is_philly_addr else address
+    is_addr = bool(has_street_code)
+    is_philly_addr = bool(has_street_code)
+    
+    output_address = parsed.get("output_address", address) if is_philly_addr else address
 
     return {
         "output_address": output_address,

@@ -39,14 +39,19 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     # against us-address.
     full_address_field = fields.get("full_address")
 
+    location_struct = pl.Struct([
+        pl.Field("is_non_philly", pl.Boolean),
+        pl.Field("is_undefined", pl.Boolean)
+    ])
+
     if full_address_field:
         non_philly_fn = partial(is_non_philly_from_full_address, philly_zips=ZIPS)
 
         flagged = lf.with_columns(
             pl.col(full_address_field)
-            .map_elements(non_philly_fn, return_dtype=pl.Boolean)
-            .alias("is_non_philly")
-        )
+            .map_elements(non_philly_fn, return_dtype=location_struct)
+            .alias("location_info")
+        ).unnest("location_info")
 
     # Otherwise, get address columns from config
     else:
@@ -74,10 +79,10 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
         non_philly_fn = partial(is_non_philly_from_split_address, zips=ZIPS)
 
         flagged = lf.with_columns(
-            address_struct.map_elements(non_philly_fn, return_dtype=pl.Boolean).alias(
-                "is_non_philly"
+            address_struct.map_elements(non_philly_fn, return_dtype=location_struct).alias(
+                "location_info"
             )
-        )
+        ).unnest("location_info")
 
     non_philly_lf = flagged.filter(pl.col("is_non_philly"))
     philly_lf = flagged.filter(~pl.col("is_non_philly"))
@@ -236,6 +241,20 @@ def enrich_with_ais(
         that the input data has a full address field
         enrichment_fields: A list of fields to add to the lazyframe.
     """
+
+    # Created augmented address for undefined locations
+    to_add = to_add.with_columns(
+        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        .then(
+            pl.concat_str([
+                pl.col("output_address"),
+                pl.lit(", Philadelphia, PA")
+            ])
+        )
+        .otherwise(pl.col("output_address"))
+        .alias("api_address")
+    )
+
     # Create a new struct of columns to add
     new_cols = pl.Struct(
         [
@@ -258,25 +277,35 @@ def enrich_with_ais(
         zip_field = addr_cfg.get("zip")
 
         # Don't include zip field if full address field is specified
+        # Use API address to account for cases where we must
+        # assume that address is in Philadelphia
         if zip_field and not full_address_field:
-            struct_expr = pl.struct(["output_address", zip_field]).map_elements(
+            struct_expr = pl.struct(["api_address", "output_address", zip_field, 
+                                     "is_addr", "is_philly_addr"]).map_elements(
                 lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
-                    s["output_address"],
+                    s["api_address"],
                     s[zip_field],
                     enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
                 ),
                 return_dtype=new_cols,
             )
         else:
-            struct_expr = pl.col("output_address").map_elements(
-                lambda address: throttle_ais_lookup(
+            struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
+                .map_elements(
+                lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
-                    address,
+                    s["api_address"],
                     None,
                     enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
                 ),
                 return_dtype=new_cols,
             )
@@ -288,7 +317,7 @@ def enrich_with_ais(
             .with_columns(
                 *[pl.col(tmp_name).struct.field(n).alias(n) for n in field_names]
             )
-            .drop(tmp_name)
+            .drop(tmp_name, "api_address") #Drop the temporary api_address column
         )
 
     return added
@@ -305,6 +334,19 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
     Returns:
         An enriched polars layzframe.
     """
+    
+    # Created augmented address for undefined locations
+    to_add = to_add.with_columns(
+    pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+    .then(
+        pl.concat_str([
+            pl.col("joined_address"),
+            pl.lit(", Philadelphia, PA")
+        ])
+    )
+    .otherwise(pl.col("joined_address"))
+    .alias("api_address")
+    )
 
     new_cols = pl.Struct(
         [
@@ -324,13 +366,13 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
             # Use the joined address for tomtom, as passyunk parser strips
             # state, city information
             to_add.with_columns(
-                pl.struct(["joined_address", "output_address"])
+                pl.struct(["api_address", "output_address"])
                 .map_elements(
                     lambda cols: throttle_tomtom_lookup(
                         sess,
                         parser,
                         ZIPS,
-                        cols["joined_address"],
+                        cols["api_address"],
                         cols["output_address"],
                     ),
                     return_dtype=new_cols,
@@ -340,7 +382,7 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
             .with_columns(
                 *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
             )
-            .drop("tomtom_struct")
+            .drop("tomtom_struct", "api_address")
         )
 
     return added
@@ -492,7 +534,7 @@ def process_csv(config_path) -> pl.LazyFrame:
         rejoined = (
             pl.concat([has_geo, tomtom_enriched])
             .sort("__geocode_idx__")
-            .drop(["__geocode_idx__", "joined_address", "is_non_philly"])
+            .drop(["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"])
         )
 
         # -------------------- Save Output File ---------------------- #

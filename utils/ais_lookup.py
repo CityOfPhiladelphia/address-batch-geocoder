@@ -130,6 +130,9 @@ def ais_lookup(
     address: str,
     zip: str = None,
     enrichment_fields: list = [],
+    existing_is_addr: bool = False,
+    existing_is_philly_addr: bool = False,
+    original_address: str = None,
 ) -> dict:
     """
     Given a passyunk-normalized address, looks up whether or not it is in the
@@ -176,9 +179,13 @@ def ais_lookup(
                 sess, coord_pairs, api_key)
             tiebroken_address = tiebreak_coordinate_lookups(coord_lookup_results, zip)
 
+        # if r_json is not longer than 1, no need to tiebreak
+        elif len(r_json["features"]) == 1:
+            tiebroken_address = response.json()["features"][0]
+
         # If tiebreak fails, return
         # null values for most fields.
-        elif not tiebroken_address:
+        if not tiebroken_address:
             tiebroken_address = response.json()
             normalized_addr = tiebroken_address.get("normalized", "")
             out_data["output_address"] = (
@@ -195,11 +202,8 @@ def ais_lookup(
                 out_data[field] = None
 
             return out_data
-
-        # If r_json is not longer than 1, no need to tiebreak
-        else:
-            tiebroken_address = response.json()["features"][0]
-
+        
+        # If we successfully got a tiebroken_address, process it
         if tiebroken_address:
             out_address = tiebroken_address.get("properties", "").get("street_address", "")
 
@@ -231,10 +235,11 @@ def ais_lookup(
 
             return out_data
 
-    # If no match, return none
-    out_data["output_address"] = address
-    out_data["is_addr"] = False
-    out_data["is_philly_addr"] = False
+    # If no match, return none but preserve existing address validity flags
+    # Use original_address if provided, otherwise fall back to address parameter
+    out_data["output_address"] = original_address if original_address else address
+    out_data["is_addr"] = existing_is_addr
+    out_data["is_philly_addr"] = existing_is_philly_addr
     out_data["geocode_lat"] = None
     out_data["geocode_lon"] = None
     out_data["is_multiple_match"] = False
@@ -252,9 +257,13 @@ def throttle_ais_lookup(
     address: str,
     zip: str = None,
     enrichment_fields: list = [],
+    existing_is_addr: bool = False,
+    existing_is_philly_addr: bool = False,
+    original_address: str = None,
 ) -> dict:
     """
     Helper function to throttle the number of API requests to 10 per second.
     """
     AIS_RATE_LIMITER.wait()
-    return ais_lookup(sess, api_key, address, zip, enrichment_fields)
+    return ais_lookup(sess, api_key, address, zip, enrichment_fields,
+                      existing_is_addr, existing_is_philly_addr, original_address)
