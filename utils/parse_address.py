@@ -39,13 +39,17 @@ def tag_full_address(address: str):
         address (str): The address to tag
     """
 
-    tagged, _ = usaddress.tag(address)
+    try:
+        tagged, _ = usaddress.tag(address)
 
-    city = tagged.get("PlaceName")
-    state = tagged.get("StateName")
-    zip_code = tagged.get("ZipCode")
+        city = tagged.get("PlaceName")
+        state = tagged.get("StateName")
+        zip_code = tagged.get("ZipCode")
 
-    return {"city": city, "state": state, "zip": zip_code}
+        return {"city": city, "state": state, "zip": zip_code}
+    
+    except usaddress.RepeatedLabelError:
+        return {"city": None, "state": None, "zip": None}
 
 
 def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
@@ -142,7 +146,7 @@ def is_non_philly_from_split_address(
     return flag_non_philly_address(address_data, zips)
 
 
-def find_address_fields(config_path) -> List[str]:
+def find_address_fields(config_path) -> dict[str]:
     """
     Parses which address fields to consider in the input file based on
     the content of config.yml. Raises an error if neither full_address_field

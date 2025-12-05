@@ -90,13 +90,14 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     return philly_lf, non_philly_lf
 
 
-def parse_with_passyunk_parser(parser, lf: pl.LazyFrame) -> pl.LazyFrame:
+def parse_with_passyunk_parser(parser, address_col: str, lf: pl.LazyFrame) -> pl.LazyFrame:
     """
     Given a polars LazyFrame, parses addresses in that LazyFrame
     using passyunk parser, and adds output address.
 
     Args:
         parser: A passyunk parser instance
+        address_col: The address column to parse
         lf: The polars lazyframe with an address field to parse
 
     Returns:
@@ -116,7 +117,7 @@ def parse_with_passyunk_parser(parser, lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
     lf = lf.with_columns(
-        pl.col("joined_address")
+        pl.col(address_col)
         .map_elements(lambda s: parse_address(parser, s), return_dtype=new_cols)
         .alias("passyunk_struct")
     ).unnest("passyunk_struct")
@@ -158,7 +159,8 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     # Need street_address for joining
     address_file_fields.extend(["street_address", "geocode_lat", "geocode_lon"])
 
-    return (ais_enrichment_fields, address_file_fields)
+    # Avoid issues if user specifies a field more than once
+    return (set(ais_enrichment_fields), set(address_file_fields))
 
 
 def add_address_file_fields(
@@ -469,21 +471,55 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         # ---------------- Join Addresses to Address File -------------------#
 
+        passyunk_address_field = address_fields.get("full_address")\
+            or address_fields.get("street")
+
         current_time = get_current_time()
         print(f"Joining addresses to address file at {current_time}.")
-        # Concatenate address fields, strip extra spaces
-        lf = lf.with_columns(
-            pl.concat_str(
-                [pl.col(field).fill_null("") for field in address_fields_list],
-                separator=" ",
-            )
-            .str.replace_all(r"\s+", " ")
-            .str.strip_chars()
-            .alias("joined_address")
-        )
+        # # Concatenate address fields, strip extra spaces
+        # lf = lf.with_columns(
+        #     pl.concat_str(
+        #         [pl.col(field).fill_null("") for field in address_fields_list],
+        #         separator=" ",
+        #     )
+        #     .str.replace_all(r"\s+", " ")
+        #     .str.strip_chars()
+        #     .alias("joined_address")
+        # )
 
         parser = PassyunkParser()
-        lf = parse_with_passyunk_parser(parser, lf)
+
+        lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
+
+
+        # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
+        # Only do this for split address fields (street/city/state/zip)
+        # Don't do this for full_address fields, as Passyunk strips city/state
+        if 'street' in address_fields.keys():
+            # Build list of available location components
+            location_components = []
+            for key in ['city', 'state', 'zip']:
+                if key in address_fields.keys() and address_fields[key] is not None:
+                    location_components.append(pl.col(address_fields[key]).fill_null(""))
+            
+            lf = lf.with_columns(
+                pl.when(pl.col("output_address").is_not_null())
+                .then(
+                    pl.concat_str(
+                        [pl.col("output_address")] + location_components,
+                        separator=" ",
+                    )
+                    .str.replace_all(r"\s+", " ")
+                    .str.strip_chars()
+                )
+                .otherwise(pl.col(passyunk_address_field))
+                .alias("joined_address")
+            )
+        else:
+            # For full_address cases, use the original field as joined_address
+            lf = lf.with_columns(
+                pl.col(passyunk_address_field).alias("joined_address")
+            )
 
         # ---------------- Split out Non Philly Addresses -------------------#
         current_time = get_current_time()
