@@ -5,7 +5,6 @@ AIS_API_KEY:
 # Input File Config
 input_file:
 geography_file:
-zip_code_filepath: ./mapping/zip_codes.csv
 
 full_address_field:
 

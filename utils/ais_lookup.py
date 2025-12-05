@@ -1,4 +1,4 @@
-import requests, time
+import requests
 from retrying import retry
 from .rate_limiter import RateLimiter
 from requests.packages.urllib3.exceptions import InsecureRequestWarning

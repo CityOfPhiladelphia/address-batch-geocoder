@@ -1,5 +1,4 @@
-import yaml, re, polars as pl, usaddress, sys
-from typing import List
+import yaml, re, usaddress, sys
 
 
 def infer_city_state_field(config_path) -> dict:
