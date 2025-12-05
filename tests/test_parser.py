@@ -86,7 +86,7 @@ def test_flag_non_philly_returns_false():
 
     result = flag_non_philly_address(address_data, zips)
 
-    assert result == False
+    assert result == {"is_non_philly": False, "is_undefined": False}
 
 
 def test_flag_non_philly_returns_true():
@@ -95,7 +95,7 @@ def test_flag_non_philly_returns_true():
 
     result = flag_non_philly_address(address_data, zips)
 
-    assert result == True
+    assert result == {"is_non_philly": True, "is_undefined": False}
 
 
 def test_flag_non_philly_returns_false_zip_only():
@@ -103,7 +103,7 @@ def test_flag_non_philly_returns_false_zip_only():
 
     result = flag_non_philly_address(address_data, zips)
 
-    assert result == False
+    assert result == {"is_non_philly": False, "is_undefined": False}
 
 
 def test_flag_non_philly_returns_true_zip_only():
@@ -111,7 +111,7 @@ def test_flag_non_philly_returns_true_zip_only():
 
     result = flag_non_philly_address(address_data, zips)
 
-    assert result == True
+    assert result == {"is_non_philly": True, "is_undefined": False}
 
 
 def test_parse_non_philly_address():
@@ -122,9 +122,8 @@ def test_parse_non_philly_address():
     is_philly_addr = parsed["is_philly_addr"]
 
     assert addr == "123 fake st"
-    assert is_addr == True
+    assert is_addr == False
     assert is_philly_addr == False
-
 
 def test_parse_non_address():
     parsed = parse("not an address")

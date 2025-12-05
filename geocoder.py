@@ -1,4 +1,4 @@
-import yaml, polars as pl, requests, click, os
+import yaml, polars as pl, requests, click, os, tempfile
 from pathlib import Path
 from datetime import datetime
 from functools import partial
@@ -39,14 +39,19 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     # against us-address.
     full_address_field = fields.get("full_address")
 
+    location_struct = pl.Struct([
+        pl.Field("is_non_philly", pl.Boolean),
+        pl.Field("is_undefined", pl.Boolean)
+    ])
+
     if full_address_field:
         non_philly_fn = partial(is_non_philly_from_full_address, philly_zips=ZIPS)
 
         flagged = lf.with_columns(
             pl.col(full_address_field)
-            .map_elements(non_philly_fn, return_dtype=pl.Boolean)
-            .alias("is_non_philly")
-        )
+            .map_elements(non_philly_fn, return_dtype=location_struct)
+            .alias("location_info")
+        ).unnest("location_info")
 
     # Otherwise, get address columns from config
     else:
@@ -74,10 +79,10 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
         non_philly_fn = partial(is_non_philly_from_split_address, zips=ZIPS)
 
         flagged = lf.with_columns(
-            address_struct.map_elements(non_philly_fn, return_dtype=pl.Boolean).alias(
-                "is_non_philly"
+            address_struct.map_elements(non_philly_fn, return_dtype=location_struct).alias(
+                "location_info"
             )
-        )
+        ).unnest("location_info")
 
     non_philly_lf = flagged.filter(pl.col("is_non_philly"))
     philly_lf = flagged.filter(~pl.col("is_non_philly"))
@@ -85,13 +90,14 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     return philly_lf, non_philly_lf
 
 
-def parse_with_passyunk_parser(parser, lf: pl.LazyFrame) -> pl.LazyFrame:
+def parse_with_passyunk_parser(parser, address_col: str, lf: pl.LazyFrame) -> pl.LazyFrame:
     """
     Given a polars LazyFrame, parses addresses in that LazyFrame
     using passyunk parser, and adds output address.
 
     Args:
         parser: A passyunk parser instance
+        address_col: The address column to parse
         lf: The polars lazyframe with an address field to parse
 
     Returns:
@@ -111,7 +117,7 @@ def parse_with_passyunk_parser(parser, lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
     lf = lf.with_columns(
-        pl.col("joined_address")
+        pl.col(address_col)
         .map_elements(lambda s: parse_address(parser, s), return_dtype=new_cols)
         .alias("passyunk_struct")
     ).unnest("passyunk_struct")
@@ -153,7 +159,8 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     # Need street_address for joining
     address_file_fields.extend(["street_address", "geocode_lat", "geocode_lon"])
 
-    return (ais_enrichment_fields, address_file_fields)
+    # Avoid issues if user specifies a field more than once
+    return (set(ais_enrichment_fields), set(address_file_fields))
 
 
 def add_address_file_fields(
@@ -173,6 +180,16 @@ def add_address_file_fields(
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
+    # Check which enrichment fields would conflict with existing columns
+    existing_cols = input_data.collect_schema().names()
+    enrichment_col_names = [key for key, value in POSSIBLE_FIELDS.items() if value in address_fields]
+    conflicts = [field for field in enrichment_col_names if field in existing_cols]
+    
+    # Rename conflicting input columns to _left
+    if conflicts:
+        rename_input = {field: field + "_left" for field in conflicts}
+        input_data = input_data.rename(rename_input)
+    
     rename_mapping = {
         value: key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
     }
@@ -226,6 +243,20 @@ def enrich_with_ais(
         that the input data has a full address field
         enrichment_fields: A list of fields to add to the lazyframe.
     """
+
+    # Created augmented address for undefined locations
+    to_add = to_add.with_columns(
+        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        .then(
+            pl.concat_str([
+                pl.col("output_address"),
+                pl.lit(", Philadelphia, PA")
+            ])
+        )
+        .otherwise(pl.col("output_address"))
+        .alias("api_address")
+    )
+
     # Create a new struct of columns to add
     new_cols = pl.Struct(
         [
@@ -248,25 +279,35 @@ def enrich_with_ais(
         zip_field = addr_cfg.get("zip")
 
         # Don't include zip field if full address field is specified
+        # Use API address to account for cases where we must
+        # assume that address is in Philadelphia
         if zip_field and not full_address_field:
-            struct_expr = pl.struct(["output_address", zip_field]).map_elements(
+            struct_expr = pl.struct(["api_address", "output_address", zip_field, 
+                                     "is_addr", "is_philly_addr"]).map_elements(
                 lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
-                    s["output_address"],
+                    s["api_address"],
                     s[zip_field],
                     enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
                 ),
                 return_dtype=new_cols,
             )
         else:
-            struct_expr = pl.col("output_address").map_elements(
-                lambda address: throttle_ais_lookup(
+            struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
+                .map_elements(
+                lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
-                    address,
+                    s["api_address"],
                     None,
                     enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
                 ),
                 return_dtype=new_cols,
             )
@@ -278,7 +319,7 @@ def enrich_with_ais(
             .with_columns(
                 *[pl.col(tmp_name).struct.field(n).alias(n) for n in field_names]
             )
-            .drop(tmp_name)
+            .drop(tmp_name, "api_address") #Drop the temporary api_address column
         )
 
     return added
@@ -295,6 +336,19 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
     Returns:
         An enriched polars layzframe.
     """
+    
+    # Created augmented address for undefined locations
+    to_add = to_add.with_columns(
+    pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+    .then(
+        pl.concat_str([
+            pl.col("joined_address"),
+            pl.lit(", Philadelphia, PA")
+        ])
+    )
+    .otherwise(pl.col("joined_address"))
+    .alias("api_address")
+    )
 
     new_cols = pl.Struct(
         [
@@ -314,13 +368,13 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
             # Use the joined address for tomtom, as passyunk parser strips
             # state, city information
             to_add.with_columns(
-                pl.struct(["joined_address", "output_address"])
+                pl.struct(["api_address", "output_address"])
                 .map_elements(
                     lambda cols: throttle_tomtom_lookup(
                         sess,
                         parser,
                         ZIPS,
-                        cols["joined_address"],
+                        cols["api_address"],
                         cols["output_address"],
                     ),
                     return_dtype=new_cols,
@@ -330,7 +384,7 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
             .with_columns(
                 *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
             )
-            .drop("tomtom_struct")
+            .drop("tomtom_struct", "api_address")
         )
 
     return added
@@ -373,126 +427,171 @@ def process_csv(config_path) -> pl.LazyFrame:
     address_fields = find_address_fields(config_path)
 
     # Detect input file encoding
-
     encoding = detect_file_encoding(filepath)
+
+    # Save original filepath for output naming
+    original_filepath = filepath
 
     # If encoding is not UTF-8, recode it
     utf8_filepath = ""
     if encoding != "UTF-8":
-
         print(f"Converting file encoding from {encoding} to UTF-8")
-        utf8_filepath = Path(filepath).with_suffix(Path(filepath).suffix + ".utf8")
+
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.csv',
+            delete=False,
+            encoding='utf-8'
+        ) as temp_file:
+            utf8_filepath = temp_file.name
+
         recode_to_utf8(filepath, utf8_filepath, encoding)
         filepath = utf8_filepath
 
-    # infer schema = False infers everything as a string. Otherwise, polars
-    # will attempt to infer zip codes like 19114-3409 as an int
-    lf = pl.scan_csv(
-        filepath,
-        row_index_name="__geocode_idx__",
-        infer_schema=False,
-        encoding="utf8-lossy",
-    )
-
-    # Check if there are invalid address fields specified
-    file_cols = lf.collect_schema().names()
-    address_fields_list = [field for field in address_fields.values() if field]
-    diff = [field for field in address_fields_list if field not in file_cols]
-
-    if diff:
-        raise ValueError(
-            "The following fields specified in the config"
-            f"file are not present in the input file: {diff}"
+    try:
+        # infer schema = False infers everything as a string. Otherwise, polars
+        # will attempt to infer zip codes like 19114-3409 as an int
+        lf = pl.scan_csv(
+            filepath,
+            row_index_name="__geocode_idx__",
+            infer_schema=False,
+            encoding="utf8-lossy",
         )
 
-    # ---------------- Join Addresses to Address File -------------------#
+        # Check if there are invalid address fields specified
+        file_cols = lf.collect_schema().names()
+        address_fields_list = [field for field in address_fields.values() if field]
+        diff = [field for field in address_fields_list if field not in file_cols]
 
-    current_time = get_current_time()
-    print(f"Joining addresses to address file at {current_time}.")
-    # Concatenate address fields, strip extra spaces
-    lf = lf.with_columns(
-        pl.concat_str(
-            [pl.col(field).fill_null("") for field in address_fields_list],
-            separator=" ",
+        if diff:
+            raise ValueError(
+                "The following fields specified in the config"
+                f"file are not present in the input file: {diff}"
+            )
+
+        # ---------------- Join Addresses to Address File -------------------#
+
+        passyunk_address_field = address_fields.get("full_address")\
+            or address_fields.get("street")
+
+        current_time = get_current_time()
+        print(f"Joining addresses to address file at {current_time}.")
+        # # Concatenate address fields, strip extra spaces
+        # lf = lf.with_columns(
+        #     pl.concat_str(
+        #         [pl.col(field).fill_null("") for field in address_fields_list],
+        #         separator=" ",
+        #     )
+        #     .str.replace_all(r"\s+", " ")
+        #     .str.strip_chars()
+        #     .alias("joined_address")
+        # )
+
+        parser = PassyunkParser()
+
+        lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
+
+
+        # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
+        # Only do this for split address fields (street/city/state/zip)
+        # Don't do this for full_address fields, as Passyunk strips city/state
+        if 'street' in address_fields.keys():
+            # Build list of available location components
+            location_components = []
+            for key in ['city', 'state', 'zip']:
+                if key in address_fields.keys() and address_fields[key] is not None:
+                    location_components.append(pl.col(address_fields[key]).fill_null(""))
+            
+            lf = lf.with_columns(
+                pl.when(pl.col("output_address").is_not_null())
+                .then(
+                    pl.concat_str(
+                        [pl.col("output_address")] + location_components,
+                        separator=" ",
+                    )
+                    .str.replace_all(r"\s+", " ")
+                    .str.strip_chars()
+                )
+                .otherwise(pl.col(passyunk_address_field))
+                .alias("joined_address")
+            )
+        else:
+            # For full_address cases, use the original field as joined_address
+            lf = lf.with_columns(
+                pl.col(passyunk_address_field).alias("joined_address")
+            )
+
+        # ---------------- Split out Non Philly Addresses -------------------#
+        current_time = get_current_time()
+        print(f"Identifying non-Philadelphia addresses at {current_time}.")
+        philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+
+        # Generate the names of columns to add for both the AIS API
+        # and the address file
+        ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
+            config
         )
-        .str.replace_all(r"\s+", " ")
-        .str.strip_chars()
-        .alias("joined_address")
-    )
 
-    parser = PassyunkParser()
-    lf = parse_with_passyunk_parser(parser, lf)
+        joined_lf = add_address_file_fields(
+            geo_filepath, philly_lf, address_file_enrichment_fields
+        )
 
-    # ---------------- Split out Non Philly Addresses -------------------#
-    current_time = get_current_time()
-    print(f"Identifying non-Philadelphia addresses at {current_time}.")
-    philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+        # Split out fields that did not match the address file
+        # and attempt to match them with the AIS API
 
-    # Generate the names of columns to add for both the AIS API
-    # and the address file
-    ais_enrichment_fields, address_file_enrichment_fields = build_enrichment_fields(
-        config
-    )
+        # -------------------------- Add Fields from AIS ------------------ #
+        current_time = get_current_time()
+        print(f"Adding fields from AIS at {get_current_time()}")
 
-    joined_lf = add_address_file_fields(
-        geo_filepath, philly_lf, address_file_enrichment_fields
-    )
+        has_geo, needs_geo = split_geos(joined_lf)
 
-    # Split out fields that did not match the address file
-    # and attempt to match them with the AIS API
+        uses_full_address = bool(address_fields.get("full_address"))
+        ais_enriched = enrich_with_ais(
+            config, needs_geo, uses_full_address, ais_enrichment_fields
+        )
 
-    # -------------------------- Add Fields from AIS ------------------ #
-    current_time = get_current_time()
-    print(f"Adding fields from AIS at {get_current_time()}")
+        ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
-    has_geo, needs_geo = split_geos(joined_lf)
+        # -------------- Check Match Failures Against TomTom ------------------ #
 
-    uses_full_address = bool(address_fields.get("full_address"))
-    ais_enriched = enrich_with_ais(
-        config, needs_geo, uses_full_address, ais_enrichment_fields
-    )
+        has_geo, needs_geo = split_geos(ais_rejoined)
 
-    ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
+        current_time = get_current_time()
+        print(f"Adding fields from TomTom at {get_current_time()}")
 
-    # -------------- Check Match Failures Against TomTom ------------------ #
+        # Rejoin the addresses marked as non-philly for tomtom search
+        # at the beginning of the process
+        needs_geo = pl.concat([non_philly_lf, needs_geo], how="diagonal").sort(
+            "__geocode_idx__"
+        )
 
-    has_geo, needs_geo = split_geos(ais_rejoined)
+        tomtom_enriched = enrich_with_tomtom(parser, needs_geo)
 
-    current_time = get_current_time()
-    print(f"Adding fields from TomTom at {get_current_time()}")
+        rejoined = (
+            pl.concat([has_geo, tomtom_enriched])
+            .sort("__geocode_idx__")
+            .drop(["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"])
+        )
 
-    # Rejoin the addresses marked as non-philly for tomtom search
-    # at the beginning of the process
-    needs_geo = pl.concat([non_philly_lf, needs_geo], how="diagonal").sort(
-        "__geocode_idx__"
-    )
+        # -------------------- Save Output File ---------------------- #
 
-    tomtom_enriched = enrich_with_tomtom(parser, needs_geo)
+        in_path = PurePath(original_filepath)
 
-    rejoined = (
-        pl.concat([has_geo, tomtom_enriched])
-        .sort("__geocode_idx__")
-        .drop(["__geocode_idx__", "joined_address", "is_non_philly"])
-    )
+        # If filepath has multiple suffixes, remove them
+        stem = in_path.name.replace("".join(in_path.suffixes), "")
 
-    # -------------------- Save Output File ---------------------- #
+        out_path = f"{stem}_enriched.csv"
 
-    in_path = PurePath(filepath)
+        out_path = str(in_path.parent / out_path)
 
-    # If filepath has multiple suffixes, remove them
-    stem = in_path.name.replace("".join(in_path.suffixes), "")
+        rejoined.sink_csv(out_path)
 
-    out_path = f"{stem}_enriched.csv"
+        current_time = get_current_time()
+        print(f"Enrichment complete at {current_time}.")
 
-    out_path = str(in_path.parent / out_path)
-
-    rejoined.sink_csv(out_path)
-
-    current_time = get_current_time()
-    print(f"Enrichment complete at {current_time}.")
-
-    if utf8_filepath:
-        os.remove(utf8_filepath)
+    finally:
+        if utf8_filepath:
+            os.remove(utf8_filepath)
 
 
 if __name__ == "__main__":

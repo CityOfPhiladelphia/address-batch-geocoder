@@ -68,7 +68,10 @@ def tomtom_lookup(
             # determine whether or not the full address is in Philadelphia,
             # so we use the usaddress module.
             address_tagged = tag_full_address(address)
-            is_philly_addr = not flag_non_philly_address(address_tagged, philly_zips)
+            
+            address_flagged = flag_non_philly_address(address_tagged, philly_zips)
+
+            is_philly_addr = not address_flagged['is_non_philly']
 
             parsed_address = (
                 parser.parse(address).get("components", "").get("output_address", "")

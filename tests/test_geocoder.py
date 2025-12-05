@@ -12,15 +12,15 @@ def test_build_enrichment_fields_returns_fields():
     }
 
     expected = (
-        ["census_tract_2020", "census_block_group_2020", "census_block_2020"],
-        [
+        {"census_tract_2020", "census_block_group_2020", "census_block_2020"},
+        {
             "census_tract_2020",
             "census_block_group_2020",
             "census_block_2020",
             "street_address",
             "geocode_lat",
             "geocode_lon",
-        ],
+        },
     )
 
     actual = build_enrichment_fields(config)
