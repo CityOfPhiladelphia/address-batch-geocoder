@@ -105,7 +105,7 @@ typing-extensions==4.15.0
     #   black
     #   exceptiongroup
     #   ipython
-urllib3==2.5.0
+urllib3==2.6.0
     # via requests
 usaddress==0.5.16
     # via address-geocoder (pyproject.toml)
