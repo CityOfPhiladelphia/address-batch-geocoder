@@ -121,6 +121,8 @@ enrichment_fields:
   - census_block_2020
 ```
 
+Note that if one of the input fields has a column the same name as 
+
 6. You're now ready to run the geocoder:
 
 ```
@@ -167,87 +169,130 @@ python3 pytest tests/test_parser.py::test_parse_address
 ```
 
 ## Enrichment Fields
+Note that if any of the fields in the input file have the same name as
+an enrichment field, the incoming input file field will be renamed to have the _left suffix.
+
 | `Field` |
 | --- |
-|`address_low`|
-|`address_low_suffix`|
-|`address_low_frac`|
 |`address_high`|
-|`street_predir`|
-|`street_name`|
-|`street_suffix`|
-|`street_postdir`|
-|`unit_type`|
-|`unit_num`|
-|`street_code`|
-|`seg_id`|
-|`zip_code`|
-|`zip_4`|
-|`pwd_parcel_id`|
-|`dor_parcel_id`|
-|`li_address_key`|
-|`eclipse_location_id`|
+|`address_low_frac`|
+|`address_low_suffix`|
+|`address_low`|
 |`bin`|
-|`zoning_document_ids`|
-|`pwd_account_nums`|
-|`opa_account_num`|
-|`opa_owners`|
-|`opa_address`|
-|`center_city_district`|
-|`cua_zone`|
-|`li_district`|
-|`philly_rising_area`|
-|`census_tract_2010`|
-|`census_block_group_2010`|
 |`census_block_2010`|
-|`census_tract_2020`|
-|`census_block_group_2020`|
 |`census_block_2020`|
+|`census_block_group_2010`|
+|`census_block_group_2020`|
+|`census_tract_2010`|
+|`census_tract_2020`|
+|`center_city_district`|
+|`clean_philly_block_captain`|
+|`commercial_corridor`|
 |`council_district_2016`|
 |`council_district_2024`|
-|`political_ward`|
+|`cua_zone`|
+|`dor_parcel_id`|
+|`eclipse_location_id`|
+|`elementary_school`|
+|`engine_local`|
+|`high_school`|
+|`highway_district`|
+|`highway_section`|
+|`highway_subsection`|
+|`historic_district`|
+|`historic_site`|
+|`historic_street`|
+|`ladder_local`|
+|`lane_closure`|
+|`leaf_collection_area`|
+|`li_address_key`|
+|`li_district`|
+|`major_phila_watershed`|
+|`middle_school`|
+|`neighborhood_advisory_committee`|
+|`opa_account_num`|
+|`opa_address`|
+|`opa_owners`|
+|`philly_rising_area`|
+|`planning_district`|
+|`police_district`|
+|`police_division`|
+|`police_service_area`|
 |`political_division`|
+|`political_ward`|
+|`ppr_friends`|
+|`pwd_account_nums`|
+|`pwd_center_city_district`|
+|`pwd_maint_district`|
+|`pwd_parcel_id`|
+|`pwd_pressure_district`|
+|`pwd_treatment_plant`|
+|`pwd_water_plate`|
+|`recycling_diversion_rate`|
+|`rubbish_recycle_day`|
+|`sanitation_area`|
+|`sanitation_convenience_center`|
+|`sanitation_district`|
+|`seg_id`|
 |`state_house_rep_2012`|
 |`state_house_rep_2022`|
 |`state_senate_2012`|
 |`state_senate_2022`|
+|`street_code`|
+|`street_light_route`|
+|`street_name`|
+|`street_postdir`|
+|`street_predir`|
+|`street_suffix`|
+|`traffic_district`|
+|`traffic_pm_district`|
+|`unit_num`|
+|`unit_type`|
 |`us_congressional_2012`|
 |`us_congressional_2018`|
 |`us_congressional_2022`|
-|`planning_district`|
-|`elementary_school`|
-|`middle_school`|
-|`high_school`|
-|`zoning`|
+|`zip_4`|
+|`zip_code`|
+|`zoning_document_ids`|
 |`zoning_rco`|
-|`commercial_corridor`|
-|`historic_district`|
-|`historic_site`|
-|`police_division`|
-|`police_district`|
-|`police_service_area`|
-|`rubbish_recycle_day`|
-|`recycling_diversion_rate`|
-|`leaf_collection_area`|
-|`sanitation_area`|
-|`sanitation_district`|
-|`sanitation_convenience_center`|
-|`clean_philly_block_captain`|
-|`historic_street`|
-|`highway_district`|
-|`highway_section`|
-|`highway_subsection`|
-|`traffic_district`|
-|`traffic_pm_district`|
-|`street_light_route`|
-|`lane_closure`|
-|`pwd_maint_district`|
-|`pwd_pressure_district`|
-|`pwd_treatment_plant`|
-|`pwd_water_plate`|
-|`pwd_center_city_district`|
-|`major_phila_watershed`|
-|`neighborhood_advisory_committee`|
-|`ppr_friends`|
-|`engine_local`|
-|`ladder_local`|
+|`zoning`|
+
+## Matching Process
+```mermaid
+flowchart TB
+    A["Input Address"] --> B@{ label: "Is it a Philadelphia address? If unknown, assume it's Philadelphia." }
+    B -- Yes --> C["Match to address file"]
+    B -- No --> D["Match to TomTom"]
+    C -- Match --> E["Return geocoded address with enrichment fields"]
+    C -- No Match --> F["Is the address an intersection?"]
+    D -- Match --> G["Return geocoded address, but no enrichment fields"]
+    D -- No Match --> H["Return non-match"]
+    F -- Yes --> I["Get intersection latitude and longitude from AIS"]
+    F -- No --> J["Run AIS address match"]
+    I --> K["Get address through AIS reverse lookup"]
+    J -- Match --> E
+    J -- No Match --> D
+    K --> J
+
+    A@{ shape: manual-input}
+    B@{ shape: decision}
+    C@{ shape: process}
+    D@{ shape: process}
+    E@{ shape: terminal}
+    F@{ shape: decision}
+    G@{ shape: terminal}
+    H@{ shape: terminal}
+    I@{ shape: process}
+    J@{ shape: process}
+    K@{ shape: process}
+    style B fill:#BBDEFB
+    style C fill:#FFE0B2
+    style D fill:#FFE0B2
+    style E fill:#C8E6C9
+    style F fill:#BBDEFB
+    style G fill:#FFF9C4
+    style H fill:#FFCDD2
+    style I fill:#FFE0B2
+    style J fill:#FFE0B2
+    style K fill:#FFE0B2
+```
