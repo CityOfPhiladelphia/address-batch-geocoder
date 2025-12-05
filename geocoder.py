@@ -282,35 +282,37 @@ def enrich_with_ais(
         # Use API address to account for cases where we must
         # assume that address is in Philadelphia
         if zip_field and not full_address_field:
-            struct_expr = pl.struct(["api_address", "output_address", zip_field, 
-                                     "is_addr", "is_philly_addr"]).map_elements(
-                lambda s: throttle_ais_lookup(
-                    sess,
-                    API_KEY,
-                    s["api_address"],
-                    s[zip_field],
-                    enrichment_fields,
-                    s["is_addr"],
-                    s["is_philly_addr"],
-                    s["output_address"]
-                ),
-                return_dtype=new_cols,
-            )
+            with pl.Config(set_streaming_chunk_size=1):
+                struct_expr = pl.struct(["api_address", "output_address", zip_field, 
+                                        "is_addr", "is_philly_addr"]).map_elements(
+                    lambda s: throttle_ais_lookup(
+                        sess,
+                        API_KEY,
+                        s["api_address"],
+                        s[zip_field],
+                        enrichment_fields,
+                        s["is_addr"],
+                        s["is_philly_addr"],
+                        s["output_address"]
+                    ),
+                    return_dtype=new_cols,
+                )
         else:
-            struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
-                .map_elements(
-                lambda s: throttle_ais_lookup(
-                    sess,
-                    API_KEY,
-                    s["api_address"],
-                    None,
-                    enrichment_fields,
-                    s["is_addr"],
-                    s["is_philly_addr"],
-                    s["output_address"]
-                ),
-                return_dtype=new_cols,
-            )
+            with pl.Config(set_streaming_chunk_size=1):
+                struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
+                    .map_elements(
+                    lambda s: throttle_ais_lookup(
+                        sess,
+                        API_KEY,
+                        s["api_address"],
+                        None,
+                        enrichment_fields,
+                        s["is_addr"],
+                        s["is_philly_addr"],
+                        s["output_address"]
+                    ),
+                    return_dtype=new_cols,
+                )
 
         tmp_name = "ais_struct"
 
@@ -364,28 +366,29 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
     field_names = [f.name for f in new_cols.fields]
 
     with requests.Session() as sess:
-        added = (
-            # Use the joined address for tomtom, as passyunk parser strips
-            # state, city information
-            to_add.with_columns(
-                pl.struct(["api_address", "output_address"])
-                .map_elements(
-                    lambda cols: throttle_tomtom_lookup(
-                        sess,
-                        parser,
-                        ZIPS,
-                        cols["api_address"],
-                        cols["output_address"],
-                    ),
-                    return_dtype=new_cols,
+        with pl.Config(set_streaming_chunk_size=1):
+            added = (
+                # Use the joined address for tomtom, as passyunk parser strips
+                # state, city information
+                to_add.with_columns(
+                    pl.struct(["api_address", "output_address"])
+                    .map_elements(
+                        lambda cols: throttle_tomtom_lookup(
+                            sess,
+                            parser,
+                            ZIPS,
+                            cols["api_address"],
+                            cols["output_address"],
+                        ),
+                        return_dtype=new_cols,
+                    )
+                    .alias("tomtom_struct")
                 )
-                .alias("tomtom_struct")
+                .with_columns(
+                    *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
+                )
+                .drop("tomtom_struct", "api_address")
             )
-            .with_columns(
-                *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
-            )
-            .drop("tomtom_struct", "api_address")
-        )
 
     return added
 
