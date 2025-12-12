@@ -83,6 +83,7 @@ def make_coordinate_lookups(
         if response.status_code >= 500:
             raise Exception("5xx response. There may be a problem with theAIS API.")
         elif response.status_code == 429:
+            print(response.text)
             raise Exception("429 response. Too many calls to the AIS API.")
 
         elif response.status_code == 401:
