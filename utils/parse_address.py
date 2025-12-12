@@ -182,7 +182,7 @@ def find_address_fields(config_path) -> dict[str]:
     if full_addr and addr_fields:
 
         print(
-            "You have specified both a full address and separate"
+            "You have specified both a full address and separate "
             "address fields in the config file. "
             "Press 1 to use the full address, "
             "2 to use the address fields, or Q to quit."
