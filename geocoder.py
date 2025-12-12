@@ -1,3 +1,9 @@
+import os
+
+# Set thread pool size to 1 to avoid API rate limits
+# This needs to be set before polars is imported
+os.environ["POLARS_MAX_THREADS"] = "1"
+
 import yaml, polars as pl, requests, click, os, tempfile
 from pathlib import Path
 from datetime import datetime
@@ -17,6 +23,8 @@ from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
 
+
+print(f"Thread pool size: {pl.thread_pool_size()}")
 
 def get_current_time():
     current_datetime = datetime.now()
@@ -282,37 +290,34 @@ def enrich_with_ais(
         # Use API address to account for cases where we must
         # assume that address is in Philadelphia
         if zip_field and not full_address_field:
-            with pl.Config(set_streaming_chunk_size=1):
-                struct_expr = pl.struct(["api_address", "output_address", zip_field, 
-                                        "is_addr", "is_philly_addr"]).map_elements(
-                    lambda s: throttle_ais_lookup(
-                        sess,
-                        API_KEY,
-                        s["api_address"],
-                        s[zip_field],
-                        enrichment_fields,
-                        s["is_addr"],
-                        s["is_philly_addr"],
-                        s["output_address"]
-                    ),
-                    return_dtype=new_cols,
-                )
+            struct_expr = pl.struct(["api_address", "output_address", zip_field, 
+                                    "is_addr", "is_philly_addr"]).map_elements(
+                lambda s: throttle_ais_lookup(
+                    sess,
+                    API_KEY,
+                    s["api_address"],
+                    s[zip_field],
+                    enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
+                ),
+                return_dtype=new_cols)
         else:
-            with pl.Config(set_streaming_chunk_size=1):
-                struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
-                    .map_elements(
-                    lambda s: throttle_ais_lookup(
-                        sess,
-                        API_KEY,
-                        s["api_address"],
-                        None,
-                        enrichment_fields,
-                        s["is_addr"],
-                        s["is_philly_addr"],
-                        s["output_address"]
-                    ),
-                    return_dtype=new_cols,
-                )
+            struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
+                .map_elements(
+                lambda s: throttle_ais_lookup(
+                    sess,
+                    API_KEY,
+                    s["api_address"],
+                    None,
+                    enrichment_fields,
+                    s["is_addr"],
+                    s["is_philly_addr"],
+                    s["output_address"]
+                ),
+                return_dtype=new_cols,
+            )
 
         tmp_name = "ais_struct"
 
