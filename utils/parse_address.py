@@ -1,4 +1,7 @@
-import yaml, re, usaddress, sys
+import yaml
+import re
+import usaddress
+import sys
 
 
 def infer_city_state_field(config_path) -> dict:
@@ -46,7 +49,7 @@ def tag_full_address(address: str):
         zip_code = tagged.get("ZipCode")
 
         return {"city": city, "state": state, "zip": zip_code}
-    
+
     except usaddress.RepeatedLabelError:
         return {"city": None, "state": None, "zip": None}
 
@@ -89,7 +92,7 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
     # Case 2: If city is non philly or state is non PA, not in Philly:
     if city is not None and city not in philly_names:
         return {"is_non_philly": True, "is_undefined": False}
-    
+
     if state is not None and state not in pa_names:
         return {"is_non_philly": True, "is_undefined": False}  # non-Philly
 
@@ -171,8 +174,7 @@ def find_address_fields(config_path) -> dict[str]:
     # If user has not specified an address field, raise
     if not full_addr and not any(addr_fields.values()):
         raise ValueError(
-            "An address field or address fields must be specified "
-            "in the config file."
+            "An address field or address fields must be specified in the config file."
         )
 
     # Handle cases where user has specified both a full address field
@@ -180,7 +182,6 @@ def find_address_fields(config_path) -> dict[str]:
     resp = ""
 
     if full_addr and addr_fields:
-
         print(
             "You have specified both a full address and separate "
             "address fields in the config file. "
@@ -241,17 +242,19 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     parsed = prsd["components"]
 
     has_street_code = False
-    for street in ('street', 'street_2'):
-        sc = parsed.get(street, {}).get('street_code')
+    for street in ("street", "street_2"):
+        sc = parsed.get(street, {}).get("street_code")
         if sc:
             has_street_code = True
-            break 
-        
+            break
+
     # If address matches to a street code, it is a philly address
     is_addr = bool(has_street_code)
     is_philly_addr = bool(has_street_code)
-    
-    output_address = parsed.get("output_address", address) if is_philly_addr else address
+
+    output_address = (
+        parsed.get("output_address", address) if is_philly_addr else address
+    )
 
     return {
         "output_address": output_address,

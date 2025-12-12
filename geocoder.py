@@ -4,8 +4,12 @@ import os
 # This needs to be set before polars is imported
 os.environ["POLARS_MAX_THREADS"] = "1"
 
-import yaml, polars as pl, requests, click, os, tempfile
-from pathlib import Path
+import yaml
+import polars as pl
+import requests
+import click
+import os
+import tempfile
 from datetime import datetime
 from functools import partial
 from utils.encoder import detect_file_encoding, recode_to_utf8
@@ -22,6 +26,7 @@ from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
+
 
 def get_current_time():
     current_datetime = datetime.now()
@@ -44,10 +49,9 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     # against us-address.
     full_address_field = fields.get("full_address")
 
-    location_struct = pl.Struct([
-        pl.Field("is_non_philly", pl.Boolean),
-        pl.Field("is_undefined", pl.Boolean)
-    ])
+    location_struct = pl.Struct(
+        [pl.Field("is_non_philly", pl.Boolean), pl.Field("is_undefined", pl.Boolean)]
+    )
 
     if full_address_field:
         non_philly_fn = partial(is_non_philly_from_full_address, philly_zips=ZIPS)
@@ -84,9 +88,9 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
         non_philly_fn = partial(is_non_philly_from_split_address, zips=ZIPS)
 
         flagged = lf.with_columns(
-            address_struct.map_elements(non_philly_fn, return_dtype=location_struct).alias(
-                "location_info"
-            )
+            address_struct.map_elements(
+                non_philly_fn, return_dtype=location_struct
+            ).alias("location_info")
         ).unnest("location_info")
 
     non_philly_lf = flagged.filter(pl.col("is_non_philly"))
@@ -95,7 +99,9 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
     return philly_lf, non_philly_lf
 
 
-def parse_with_passyunk_parser(parser, address_col: str, lf: pl.LazyFrame) -> pl.LazyFrame:
+def parse_with_passyunk_parser(
+    parser, address_col: str, lf: pl.LazyFrame
+) -> pl.LazyFrame:
     """
     Given a polars LazyFrame, parses addresses in that LazyFrame
     using passyunk parser, and adds output address.
@@ -187,14 +193,16 @@ def add_address_file_fields(
 
     # Check which enrichment fields would conflict with existing columns
     existing_cols = input_data.collect_schema().names()
-    enrichment_col_names = [key for key, value in POSSIBLE_FIELDS.items() if value in address_fields]
+    enrichment_col_names = [
+        key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
+    ]
     conflicts = [field for field in enrichment_col_names if field in existing_cols]
-    
+
     # Rename conflicting input columns to _left
     if conflicts:
         rename_input = {field: field + "_left" for field in conflicts}
         input_data = input_data.rename(rename_input)
-    
+
     rename_mapping = {
         value: key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
     }
@@ -252,12 +260,7 @@ def enrich_with_ais(
     # Created augmented address for undefined locations
     to_add = to_add.with_columns(
         pl.when(pl.col("is_undefined") & pl.col("is_addr"))
-        .then(
-            pl.concat_str([
-                pl.col("output_address"),
-                pl.lit(", Philadelphia, PA")
-            ])
-        )
+        .then(pl.concat_str([pl.col("output_address"), pl.lit(", Philadelphia, PA")]))
         .otherwise(pl.col("output_address"))
         .alias("api_address")
     )
@@ -287,8 +290,15 @@ def enrich_with_ais(
         # Use API address to account for cases where we must
         # assume that address is in Philadelphia
         if zip_field and not full_address_field:
-            struct_expr = pl.struct(["api_address", "output_address", zip_field, 
-                                    "is_addr", "is_philly_addr"]).map_elements(
+            struct_expr = pl.struct(
+                [
+                    "api_address",
+                    "output_address",
+                    zip_field,
+                    "is_addr",
+                    "is_philly_addr",
+                ]
+            ).map_elements(
                 lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
@@ -297,12 +307,14 @@ def enrich_with_ais(
                     enrichment_fields,
                     s["is_addr"],
                     s["is_philly_addr"],
-                    s["output_address"]
+                    s["output_address"],
                 ),
-                return_dtype=new_cols)
+                return_dtype=new_cols,
+            )
         else:
-            struct_expr = pl.struct(["api_address", "output_address", "is_addr", "is_philly_addr"])\
-                .map_elements(
+            struct_expr = pl.struct(
+                ["api_address", "output_address", "is_addr", "is_philly_addr"]
+            ).map_elements(
                 lambda s: throttle_ais_lookup(
                     sess,
                     API_KEY,
@@ -311,7 +323,7 @@ def enrich_with_ais(
                     enrichment_fields,
                     s["is_addr"],
                     s["is_philly_addr"],
-                    s["output_address"]
+                    s["output_address"],
                 ),
                 return_dtype=new_cols,
             )
@@ -323,7 +335,7 @@ def enrich_with_ais(
             .with_columns(
                 *[pl.col(tmp_name).struct.field(n).alias(n) for n in field_names]
             )
-            .drop(tmp_name, "api_address") #Drop the temporary api_address column
+            .drop(tmp_name, "api_address")  # Drop the temporary api_address column
         )
 
     return added
@@ -340,18 +352,13 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
     Returns:
         An enriched polars layzframe.
     """
-    
+
     # Created augmented address for undefined locations
     to_add = to_add.with_columns(
-    pl.when(pl.col("is_undefined") & pl.col("is_addr"))
-    .then(
-        pl.concat_str([
-            pl.col("joined_address"),
-            pl.lit(", Philadelphia, PA")
-        ])
-    )
-    .otherwise(pl.col("joined_address"))
-    .alias("api_address")
+        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        .then(pl.concat_str([pl.col("joined_address"), pl.lit(", Philadelphia, PA")]))
+        .otherwise(pl.col("joined_address"))
+        .alias("api_address")
     )
 
     new_cols = pl.Struct(
@@ -387,7 +394,10 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
                     .alias("tomtom_struct")
                 )
                 .with_columns(
-                    *[pl.col("tomtom_struct").struct.field(n).alias(n) for n in field_names]
+                    *[
+                        pl.col("tomtom_struct").struct.field(n).alias(n)
+                        for n in field_names
+                    ]
                 )
                 .drop("tomtom_struct", "api_address")
             )
@@ -421,11 +431,11 @@ def process_csv(config_path) -> pl.LazyFrame:
     geo_filepath = config.get("geography_file")
 
     if not filepath:
-        raise ValueError("An input filepath must be specified in the config " "file.")
+        raise ValueError("An input filepath must be specified in the config file.")
 
     if not geo_filepath:
         raise ValueError(
-            "A filepath for the geography file must be" "specified in the config."
+            "A filepath for the geography file must bespecified in the config."
         )
 
     # Determine which fields in the file are the address fields
@@ -443,10 +453,7 @@ def process_csv(config_path) -> pl.LazyFrame:
         print(f"Converting file encoding from {encoding} to UTF-8")
 
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            suffix='.csv',
-            delete=False,
-            encoding='utf-8'
+            mode="w", suffix=".csv", delete=False, encoding="utf-8"
         ) as temp_file:
             utf8_filepath = temp_file.name
 
@@ -476,8 +483,9 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         # ---------------- Join Addresses to Address File -------------------#
 
-        passyunk_address_field = address_fields.get("full_address")\
-            or address_fields.get("street")
+        passyunk_address_field = address_fields.get(
+            "full_address"
+        ) or address_fields.get("street")
 
         current_time = get_current_time()
         print(f"Joining addresses to address file at {current_time}.")
@@ -496,17 +504,18 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
 
-
         # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
         # Only do this for split address fields (street/city/state/zip)
         # Don't do this for full_address fields, as Passyunk strips city/state
-        if 'street' in address_fields.keys():
+        if "street" in address_fields.keys():
             # Build list of available location components
             location_components = []
-            for key in ['city', 'state', 'zip']:
+            for key in ["city", "state", "zip"]:
                 if key in address_fields.keys() and address_fields[key] is not None:
-                    location_components.append(pl.col(address_fields[key]).fill_null(""))
-            
+                    location_components.append(
+                        pl.col(address_fields[key]).fill_null("")
+                    )
+
             lf = lf.with_columns(
                 pl.when(pl.col("output_address").is_not_null())
                 .then(
@@ -522,9 +531,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             )
         else:
             # For full_address cases, use the original field as joined_address
-            lf = lf.with_columns(
-                pl.col(passyunk_address_field).alias("joined_address")
-            )
+            lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
 
         # ---------------- Split out Non Philly Addresses -------------------#
         current_time = get_current_time()
@@ -575,7 +582,9 @@ def process_csv(config_path) -> pl.LazyFrame:
         rejoined = (
             pl.concat([has_geo, tomtom_enriched])
             .sort("__geocode_idx__")
-            .drop(["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"])
+            .drop(
+                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"]
+            )
         )
 
         # -------------------- Save Output File ---------------------- #

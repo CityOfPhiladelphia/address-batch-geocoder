@@ -1,4 +1,5 @@
-import pytest, yaml, polars as pl
+import pytest
+import yaml
 from passyunk.parser import PassyunkParser
 from functools import partial
 from utils.zips import ZIPS
@@ -76,12 +77,11 @@ def test_parse_real_address():
     is_philly_addr = parsed["is_philly_addr"]
 
     assert addr == "123 MARKET ST"
-    assert is_addr == True
-    assert is_philly_addr == True
+    assert is_addr
+    assert is_philly_addr
 
 
 def test_flag_non_philly_returns_false():
-
     address_data = {"city": "Philadelphia", "state": "PA"}
 
     result = flag_non_philly_address(address_data, zips)
@@ -90,7 +90,6 @@ def test_flag_non_philly_returns_false():
 
 
 def test_flag_non_philly_returns_true():
-
     address_data = {"city": "Denver", "state": "CO", "zip": None}
 
     result = flag_non_philly_address(address_data, zips)
@@ -122,8 +121,9 @@ def test_parse_non_philly_address():
     is_philly_addr = parsed["is_philly_addr"]
 
     assert addr == "123 fake st"
-    assert is_addr == False
-    assert is_philly_addr == False
+    assert not is_addr
+    assert not is_philly_addr
+
 
 def test_parse_non_address():
     parsed = parse("not an address")
@@ -132,8 +132,8 @@ def test_parse_non_address():
     is_philly_addr = parsed["is_philly_addr"]
 
     assert addr == "not an address"
-    assert is_addr == False
-    assert is_philly_addr == False
+    assert not is_addr
+    assert not is_philly_addr
 
 
 def test_combine_fields_merges_correctly():
@@ -157,7 +157,6 @@ def test_combine_fields_handles_single_field():
 
 
 def test_tag_full_address_tags_correctly():
-
     address = "1234 Market Street Philadelphia PA 19107"
 
     tagged = tag_full_address(address)

@@ -26,7 +26,6 @@ def tiebreak(response: dict, zip) -> dict:
 
     candidates = []
     for candidate in response.json()["features"]:
-
         # If the AIS API zip code matches the zip code on the
         # incoming data, this record is a potential match
         if candidate["properties"].get("zip_code", "") == zip:
@@ -41,6 +40,7 @@ def tiebreak(response: dict, zip) -> dict:
 
     else:
         return None
+
 
 def get_intersection_coords(ais_dict: dict) -> list[str, str]:
     """
@@ -81,7 +81,7 @@ def make_coordinate_lookups(
         response = sess.get(ais_url, params=params, timeout=10, verify=False)
 
         if response.status_code >= 500:
-            raise Exception("5xx response. There may be a problem with the" "AIS API.")
+            raise Exception("5xx response. There may be a problem with theAIS API.")
         elif response.status_code == 429:
             raise Exception("429 response. Too many calls to the AIS API.")
 
@@ -117,12 +117,14 @@ def tiebreak_coordinate_lookups(responses: list[dict], zip: str):
     if addresses:
         return addresses[0]
 
+
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
 @retry(
     wait_exponential_multiplier=1000,
     wait_exponential_max=10000,
-    stop_max_attempt_number=5,
+    stop_max_attempt_number=3,
+    wait_fixed=200,
 )
 def ais_lookup(
     sess: requests.Session,
@@ -156,7 +158,7 @@ def ais_lookup(
     response = sess.get(ais_url, params=params, timeout=10, verify=False)
 
     if response.status_code >= 500:
-        raise Exception("5xx response. There may be a problem with the" "AIS API.")
+        raise Exception("5xx response. There may be a problem with theAIS API.")
     elif response.status_code == 429:
         raise Exception("429 response. Too many calls to the AIS API.")
 
@@ -164,7 +166,6 @@ def ais_lookup(
     # If status code is 200, that means API has found a match.
     # API will return a 404 if no match
     if response.status_code == 200:
-
         # If r_json is longer than 1, multiple matches
         # were returned and we need to tiebreak
         r_json = response.json()
@@ -172,11 +173,10 @@ def ais_lookup(
 
         if len(r_json["features"]) > 1 and r_json.get("search_type") == "address":
             tiebroken_address = tiebreak(response, zip)
-        
+
         elif r_json.get("search_type") == "intersection":
             coord_pairs = get_intersection_coords(response.json())
-            coord_lookup_results = make_coordinate_lookups(
-                sess, coord_pairs, api_key)
+            coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
             tiebroken_address = tiebreak_coordinate_lookups(coord_lookup_results, zip)
 
         # if r_json is not longer than 1, no need to tiebreak
@@ -188,9 +188,7 @@ def ais_lookup(
         if not tiebroken_address:
             tiebroken_address = response.json()
             normalized_addr = tiebroken_address.get("normalized", "")
-            out_data["output_address"] = (
-                normalized_addr if normalized_addr else address
-            )
+            out_data["output_address"] = normalized_addr if normalized_addr else address
             out_data["is_addr"] = False
             out_data["is_philly_addr"] = True
             out_data["geocode_lat"] = None
@@ -202,10 +200,12 @@ def ais_lookup(
                 out_data[field] = None
 
             return out_data
-        
+
         # If we successfully got a tiebroken_address, process it
         if tiebroken_address:
-            out_address = tiebroken_address.get("properties", "").get("street_address", "")
+            out_address = tiebroken_address.get("properties", "").get(
+                "street_address", ""
+            )
 
             try:
                 lon, lat = tiebroken_address["geometry"]["coordinates"]
@@ -265,5 +265,13 @@ def throttle_ais_lookup(
     Helper function to throttle the number of API requests to 10 per second.
     """
     AIS_RATE_LIMITER.wait()
-    return ais_lookup(sess, api_key, address, zip, enrichment_fields,
-                      existing_is_addr, existing_is_philly_addr, original_address)
+    return ais_lookup(
+        sess,
+        api_key,
+        address,
+        zip,
+        enrichment_fields,
+        existing_is_addr,
+        existing_is_philly_addr,
+        original_address,
+    )

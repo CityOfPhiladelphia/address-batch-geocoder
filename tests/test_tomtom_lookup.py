@@ -40,7 +40,6 @@ json_response_nonmatch = {
 
 
 def test_false_address_returns_none_if_bad_address(monkeypatch):
-
     class FakeResponse:
         def __init__(self, data, status_code=404):
             self._data = data

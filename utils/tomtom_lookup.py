@@ -39,13 +39,11 @@ def tomtom_lookup(
     response = sess.get(tomtom_url, params=params, timeout=10)
 
     if response.status_code >= 500:
-        raise Exception(
-            "5xx response. There may be a problem with Tomtom" "API server."
-        )
+        raise Exception("5xx response. There may be a problem with TomtomAPI server.")
     # 429 response indicates we're being blocked by the API.
     elif response.status_code == 429:
         raise Exception(
-            "429 response. Too many API calls" "to TomTom in a short amount of time."
+            "429 response. Too many API callsto TomTom in a short amount of time."
         )
 
     out_data = {}
@@ -68,10 +66,10 @@ def tomtom_lookup(
             # determine whether or not the full address is in Philadelphia,
             # so we use the usaddress module.
             address_tagged = tag_full_address(address)
-            
+
             address_flagged = flag_non_philly_address(address_tagged, philly_zips)
 
-            is_philly_addr = not address_flagged['is_non_philly']
+            is_philly_addr = not address_flagged["is_non_philly"]
 
             parsed_address = (
                 parser.parse(address).get("components", "").get("output_address", "")

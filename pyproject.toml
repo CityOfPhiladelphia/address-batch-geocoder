@@ -15,6 +15,7 @@ dependencies = [
     "pytest>=8.4.2",
     "pyyaml>=6.0.3",
     "retrying>=1.4.2",
+    "ruff>=0.14.9",
     "setuptools>=80.9.0",
     "usaddress>=0.5.16",
     "wheel>=0.45.1",
