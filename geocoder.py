@@ -23,9 +23,6 @@ from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
 from pathlib import PurePath
 
-
-print(f"Thread pool size: {pl.thread_pool_size()}")
-
 def get_current_time():
     current_datetime = datetime.now()
     return current_datetime.strftime("%H:%M:%S")
