@@ -42,6 +42,7 @@ def tomtom_lookup(
         raise Exception("5xx response. There may be a problem with TomtomAPI server.")
     # 429 response indicates we're being blocked by the API.
     elif response.status_code == 429:
+        print(response.text)
         raise Exception(
             "429 response. Too many API callsto TomTom in a short amount of time."
         )
