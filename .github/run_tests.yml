@@ -1,0 +1,63 @@
+name: Test Push or Pull Request To Main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - reopened
+    branches:
+      - main
+    
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Get code
+          uses: actions/checkout@v5
+        - name: Set up Python
+          uses: actions/setup-python@v6
+          with:
+            python-version-file: ".python-version"
+        - name: Install uv
+          uses: astral-sh/setup-uv@v7
+          with:
+            version: "0.9.5"
+        - name: Install project
+          run: uv sync
+        - name: Run tests
+          run: uv run pytest tests
+
+name: Test Merge to Main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    
+  jobs:
+  if_merged:
+    if: github.event.pull_request.merged == true
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Get code
+          uses: actions/checkout@v5
+        - name: Set up Python
+          uses: actions/setup-python@v6
+          with:
+            python-version-file: ".python-version"
+        - name: Install uv
+          uses: astral-sh/setup-uv@v7
+          with:
+            version: "0.9.5"
+        - name: Install project
+          run: uv sync
+        - name: Run tests
+          run: uv run pytest tests
+
