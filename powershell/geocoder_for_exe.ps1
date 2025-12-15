@@ -1,5 +1,4 @@
 # Get the directory of the currently executing script
-###
 $ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path) 
 $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 
