@@ -1,12 +1,13 @@
 import requests
 from retrying import retry
 from .rate_limiter import RateLimiter
+from urllib.parse import quote
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 # Suppress the InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-AIS_RATE_LIMITER = RateLimiter(max_calls=9, period=1.0)
+AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 
 
 def tiebreak(response: dict, zip) -> dict:
@@ -60,7 +61,11 @@ def get_intersection_coords(ais_dict: dict) -> list[str, str]:
 
     return coords
 
-
+@retry(
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=10000,
+    stop_max_attempt_number=5,
+)
 def make_coordinate_lookups(
     sess: requests.Session,
     coords: list,
@@ -149,11 +154,11 @@ def ais_lookup(
         A dict with standardized address, latitude and longitude,
         and user-requested fields.
     """
-    ais_url = "https://api.phila.gov/ais/v1/search/" + address
+    ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=2272&max_range=0" 
     params = {}
     params["gatekeeperKey"] = api_key
 
-    response = sess.get(ais_url, params=params, timeout=10, verify=False)
+    response = sess.get(ais_url, verify=False)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the" "AIS API.")
