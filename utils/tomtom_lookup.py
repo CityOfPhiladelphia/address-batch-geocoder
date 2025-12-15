@@ -34,7 +34,7 @@ def tomtom_lookup(
     tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
 
     # Need to specify json format, HTML by default
-    params = {"Address": address, "f": "pjson"}
+    params = {"Address": address, "f": "pjson", "outSR": "4326"}
 
     response = sess.get(tomtom_url, params=params, timeout=10)
 
