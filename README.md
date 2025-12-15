@@ -1,5 +1,5 @@
 # address-geocoder
-A tool to standardize and geocode Philadelphia addresses
+A tool to standardize and geocode Philadelphia addresses. Latitude and Longitude are in the EPSG:4326 coordinate system.
 
 ## 1. Setup
 You will need the following things:
