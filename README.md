@@ -165,7 +165,19 @@ python3 pytest tests/test_parser.py
 
 To run one test within a file:
 ```
-python3 pytest tests/test_parser.py::test_parse_address
+python3 pytest tests/test_parser.py::test_parse_address#
+```
+
+## Publishing a Release
+This code is intended to be called using an executable file generated from
+`powershell/geocoder_for_exe.ps1`. If changes are made to this file, we need to
+make a new release.
+
+To create a release, make sure the commit is tagged with a version number like `v1.0.0`:
+```
+bash# When you're ready to create a release:
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 ## Enrichment Fields

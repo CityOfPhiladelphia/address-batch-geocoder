@@ -1,0 +1,39 @@
+name: Build and Release Powershell Executable
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'powershell/*'
+    tags:
+      - 'v*'
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+    
+    - name: Install PS2EXE module
+      shell: pwsh
+      run: |
+        Set-PSRepository PSGallery -InstallationPolicy Trusted
+        Install-Module -Name PS2EXE -Force -SkipPublisherCheck
+    
+    - name: Convert PowerShell script to an Executable
+      shell: pwsh
+      run: |
+        $scriptFile = 'powershell/geocoder_for_exe.ps1'
+        $outputExe = 'geocoder.exe'
+        Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: geocoder.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
