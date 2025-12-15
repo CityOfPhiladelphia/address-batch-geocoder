@@ -74,7 +74,7 @@ def make_coordinate_lookups(
     """Given a list of coordinate pairs, do a reverse lookup
     against the AIS API. Returns a list of matches for each
     coordinate pair in the list."""
-
+    AIS_RATE_LIMITER.wait()
     out_data = []
 
     for coord in coords:
@@ -157,7 +157,8 @@ def ais_lookup(
         A dict with standardized address, latitude and longitude,
         and user-requested fields.
     """
-    ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=2272&max_range=0" 
+    AIS_RATE_LIMITER.wait()
+    ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=4326&max_range=0" 
     params = {}
     params["gatekeeperKey"] = api_key
 
@@ -256,29 +257,3 @@ def ais_lookup(
         out_data[field] = None
 
     return out_data
-
-
-def throttle_ais_lookup(
-    sess: requests.Session,
-    api_key: str,
-    address: str,
-    zip: str = None,
-    enrichment_fields: list = [],
-    existing_is_addr: bool = False,
-    existing_is_philly_addr: bool = False,
-    original_address: str = None,
-) -> dict:
-    """
-    Helper function to throttle the number of API requests to 10 per second.
-    """
-    AIS_RATE_LIMITER.wait()
-    return ais_lookup(
-        sess,
-        api_key,
-        address,
-        zip,
-        enrichment_fields,
-        existing_is_addr,
-        existing_is_philly_addr,
-        original_address,
-    )

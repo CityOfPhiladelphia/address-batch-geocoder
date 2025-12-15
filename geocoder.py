@@ -20,8 +20,8 @@ from utils.parse_address import (
     is_non_philly_from_full_address,
     is_non_philly_from_split_address,
 )
-from utils.ais_lookup import throttle_ais_lookup
-from utils.tomtom_lookup import throttle_tomtom_lookup
+from utils.ais_lookup import ais_lookup
+from utils.tomtom_lookup import tomtom_lookup
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
@@ -299,7 +299,7 @@ def enrich_with_ais(
                     "is_philly_addr",
                 ]
             ).map_elements(
-                lambda s: throttle_ais_lookup(
+                lambda s: ais_lookup(
                     sess,
                     API_KEY,
                     s["api_address"],
@@ -315,7 +315,7 @@ def enrich_with_ais(
             struct_expr = pl.struct(
                 ["api_address", "output_address", "is_addr", "is_philly_addr"]
             ).map_elements(
-                lambda s: throttle_ais_lookup(
+                lambda s: ais_lookup(
                     sess,
                     API_KEY,
                     s["api_address"],
@@ -382,7 +382,7 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
                 to_add.with_columns(
                     pl.struct(["api_address", "output_address"])
                     .map_elements(
-                        lambda cols: throttle_tomtom_lookup(
+                        lambda cols: tomtom_lookup(
                             sess,
                             parser,
                             ZIPS,

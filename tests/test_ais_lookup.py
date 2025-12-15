@@ -62,8 +62,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         original_address="1234 mkt st",
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234 mkt st"
-    assert created["params"] == {"gatekeeperKey": "1234"}
+    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
@@ -136,8 +135,7 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         original_address="1234 mkt st",
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234 mkt st"
-    assert created["params"] == {"gatekeeperKey": "1234"}
+    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
@@ -210,8 +208,7 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         original_address="1234 mkt st",
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234 mkt st"
-    assert created["params"] == {"gatekeeperKey": "1234"}
+    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,

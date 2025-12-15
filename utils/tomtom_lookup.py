@@ -31,6 +31,7 @@ def tomtom_lookup(
         A dict with standardized address, latitude and longitude, returned
         from TomTom.
     """
+    TOMTOM_RATE_LIMITER.wait()
     tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
 
     # Need to specify json format, HTML by default
@@ -94,13 +95,3 @@ def tomtom_lookup(
     out_data["is_philly_addr"] = False
 
     return out_data
-
-
-def throttle_tomtom_lookup(
-    sess: requests.Session, parser, philly_zips: list, address: str, fallback_addr: str
-) -> dict:
-    """
-    Helper function to throttle the number of API requests to 10 per second.
-    """
-    TOMTOM_RATE_LIMITER.wait()
-    return tomtom_lookup(sess, parser, philly_zips, address, fallback_addr)
