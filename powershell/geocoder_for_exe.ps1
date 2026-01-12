@@ -3,15 +3,20 @@ $ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path)
 $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 
 # Paths needed for script
-$installFolder = Join-Path $ScriptDirectory 'address-geocoder-main'
-$zipPath       = Join-Path $ScriptDirectory 'address-geocoder.zip'
-$venvPath      = Join-Path $installFolder   '.venv'
-$venvPython    = Join-Path $venvPath        'Scripts\python.exe'
-$venvPip       = Join-Path $venvPath        'Scripts\pip.exe'
-$activatePs1   = Join-Path $venvPath        'Scripts\Activate.ps1'
-$configYml     = Join-Path $ScriptDirectory 'config.yml'
-$configExample = Join-Path $installFolder   'config_example.yml'
-$geocoderPy    = Join-Path $installFolder   'geocoder.py'
+$installFolder      = Join-Path $ScriptDirectory 'address-geocoder-main'
+$dataDirectory      = Join-Path $ScriptDirectory 'geocoder_address_data'
+$s3URL              = 'https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv'
+$addressFileCSV     = Join-Path $dataDirectory   'address_service_area_summary.csv'
+$addressFileParquet = Join-Path $dataDirectory   'address_service_area_summary.parquet'
+$zipPath            = Join-Path $ScriptDirectory 'address-geocoder.zip'
+$venvPath           = Join-Path $installFolder   '.venv'
+$venvPython         = Join-Path $venvPath        'Scripts\python.exe'
+$venvPip            = Join-Path $venvPath        'Scripts\pip.exe'
+$activatePs1        = Join-Path $venvPath        'Scripts\Activate.ps1'
+$configYml          = Join-Path $ScriptDirectory 'config.yml'
+$configExample      = Join-Path $installFolder   'config_example.yml'
+$toParquetPy  = Join-Path $installFolder   'csv_to_parquet.py'
+$geocoderPy         = Join-Path $installFolder   'geocoder.py'
 
 # Paths needed for installation
 $wheelhouse    = Join-Path $ScriptDirectory 'wheelhouse'
@@ -289,6 +294,65 @@ function cloneOrUpdate {
     }
 }
 
+function downloadAddressFile {
+
+    # Create data directory if it doesn't exist
+    if (-Not (Test-Path $dataDirectory)) {
+        New-Item -Path $dataDirectory -ItemType Directory | Out-Null
+    }
+    
+    # Download address file if not present
+    try {
+        if (-Not (Test-Path $addressFileCSV) -and -Not(Test-Path $addressFileParquet)) {
+            Write-Host "Address file not found. Downloading from S3. This may take a few minutes..." -ForegroundColor Yellow
+            Invoke-WebRequest -Uri $s3URL -OutFile $addressFileCSV
+        }
+    }
+    catch {
+        Write-Host "Failed to download address file from S3." -ForegroundColor Red
+        if (Test-Path $addressFileCSV) {
+            Remove-Item $addressFileCSV -Force
+        }
+        exit 1
+    }
+   
+    # Convert address file to parquet if no parquet file present
+    if (-Not (Test-Path $addressFileParquet)) {   
+        Write-Host "Converting address csv into a parquet file for speed and space optimization" -ForegroundColor Yellow
+        
+        $process = Start-Process -FilePath $venvPython `
+            -ArgumentList @("-u", $toParquetPy, "--input_path", $addressFileCSV, "--output_path", $addressFileParquet) `
+            -WorkingDirectory $ScriptDirectory `
+            -NoNewWindow `
+            -Wait `
+            -PassThru
+        
+        # Check if conversion failed
+        if ($process.ExitCode -ne 0) {
+            Write-Host "Failed to convert address file into the proper format." -ForegroundColor Red
+            
+            # Remove partial parquet file if it exists
+            if (Test-Path $addressFileParquet) {
+                Remove-Item $addressFileParquet -Force
+            }
+            
+            exit 1
+        }
+    }
+
+    # If all successful, remove the CSV file to save space
+    if (Test-Path $addressFileCSV) {
+        Remove-Item $addressFileCSV -Force
+        
+        Write-Host "`n========================================" -ForegroundColor Yellow
+        Write-Host "ADDRESS FILE DOWNLOAD COMPLETE" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host "Address file can be found at $addressFileParquet" -ForegroundColor Yellow
+    }
+}
+
+
+
 $script:RepoWasJustCloned = $false
 $script:RepoWasUpdated = $false
 
@@ -297,6 +361,7 @@ installGit
 installPython
 cloneOrUpdate
 createVenvAndConfig
+downloadAddressFile
 
 # If repo was just cloned or updated, user needs to configure before running
 if ($script:RepoWasJustCloned) {

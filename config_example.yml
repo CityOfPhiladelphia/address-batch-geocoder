@@ -4,7 +4,7 @@ AIS_API_KEY:
 
 # Input File Config
 input_file:
-geography_file:
+geography_file: ./geocoder_address_data
 
 full_address_field:
 
@@ -21,7 +21,6 @@ enrichment_fields:
   - census_block_group_2020
   - census_block_2020
   - seg_id
-  - opa_owners
   - us_congressional_2022
   # ADD MORE FIELDS BELOW, EG: 
   # - census_tract_2010
