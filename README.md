@@ -222,9 +222,6 @@ an enrichment field, the incoming input file field will be renamed to have the _
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
-|`opa_account_num`|
-|`opa_address`|
-|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
@@ -233,7 +230,6 @@ an enrichment field, the incoming input file field will be renamed to have the _
 |`political_division`|
 |`political_ward`|
 |`ppr_friends`|
-|`pwd_account_nums`|
 |`pwd_center_city_district`|
 |`pwd_maint_district`|
 |`pwd_parcel_id`|

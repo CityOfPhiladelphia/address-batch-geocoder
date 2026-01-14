@@ -211,6 +211,9 @@ data/
 geocoder_address_data/
 address_*.csv
 
+# Executable FIles
+*\.exe
+
 # Config Files
 config.yml
 
