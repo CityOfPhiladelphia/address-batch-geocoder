@@ -28,7 +28,7 @@ jobs:
       run: |
         $scriptFile = 'powershell/geocoder_for_exe.ps1'
         $outputExe = 'geocoder.exe'
-        Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole
+        Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false
 
     - name: Save Release Info
       run: echo ${{ github.sha }} > release.txt
