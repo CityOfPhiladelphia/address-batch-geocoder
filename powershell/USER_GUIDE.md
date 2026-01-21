@@ -8,46 +8,57 @@ fields that the user supplies.
 ## Note:
 For more information about the geocoder, consult the GitHub repository: https://github.com/CityOfPhiladelphia/address-geocoder. The README in this repo contains more details about the matching process, and information about how to run the geocoder from the command line, if desired.
 
+## Questions?
+If you have questions about the geocoder that this FAQ cannot answer, feel free to contact citygeo at: maps@phila.gov
+
 ## 1. Prerequisites
 You will need the following things:
-1. An executable file called `geocoder.exe`. This is used to run the program. Do not save the executable in a folder that has spaces in the name.
-2. An addresses file, provided to you by CityGeo. It is recommended to place this file in the same location as `geocoder.exe`	
-3. An AIS API key, provided to you by CityGeo.
+1. An executable file called `geocoder.exe`. This is used to run the program. Do not save the executable in a folder that has spaces in the name.	
+2. An AIS API key, provided to you by CityGeo.
 
 
 ## Installation
 First, you will need to download and install the geocoder.
-You can do this by double-clicking `geocoder.exe`. This will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running the geocoder.exe again.
+
+The geocoder file can be downloaded from GitHub. The latest release can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/
+
+Read through the notes carefully, and then download `geocoder.exe` at the bottom of the readme.
+
+Once `geocoder.exe` is downloaded, move it into a folder where you can easily find it. The folder **must not** have spaces in its name.
+
+Double-clicking `geocoder.exe` will launch the program. As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
 
 Note that this script will attempt to install Python 3.10 on your machine if you do not have Python 3.10 installed on your machine.
 
-After the installation runs successfully, you are ready to set up the
-configuration file.
+The script will then attempt to download the address file. This may take a few minutes. It will save the address file and a version file in a subfolder called geocoder_address_data. Under most circumstances, you should not remove this folder or any of the files in it. Doing so will cause the script to redownload the address file.
+
+After the installation runs successfully, you are ready to set up the configuration file.
 
 ## 2. How to Use Address Geocoder
 In order to run `Address Geocoder`, first set up the configuration file. By default,
-`Address Geocoder` searchers for a file named `config.yml`. This is the recommended config filename. 
-Detailed steps for filling out the config file are in the next section.
+`Address Geocoder` searchers for a file named `config.yml`. Detailed steps for filling out the config file are in the next section.
 
 ### Configuration
 1. The script should make a config.yml file if no config.yml file exists. If the script did not do this, you can simply copy `config_example.yml` to `config.yml` either in the file explorer by running in the terminal:
 ```
 cp config_example.yml config.yml
 ```
+Do not delete, rename, or move `config_example.yml`. If you delete this file, you will need to redownload it from GitHub. 
+In most cases, it is not recommended to delete, rename, or move `config.yml`. If you rename this file, the geocoder will be unable to find it and will create a new config.yml.
+
 2. Open up config.yml, and add your AIS API Key here:
 
 ```
 AIS_API_KEY:
 ```
-3. Add the filepath for the input file (the file that you wish to enrich), and the geography file (the address file you have been given.) This should look something like this. If using relative filepaths, filepaths are relative to the address-geocoder-main folder downloaded from GitHub. For ease of use, exact filepaths are recommended:
+3. Add the filepath for the input file (the file that you wish to enrich), and the geography file (the address file you have been given.) This should look something like this. If using relative filepaths, filepaths are relative to the address-geocoder-main folder downloaded from GitHub. For ease of use, exact filepaths are recommended. Do not put the filenames in quotes:
 ```
 input_file: ./data/example_input_4.csv
 geography_file: ./data/addresses.parquet
 ```
-4. Map the address fields to the name of the fields in the csv that you wish
-to process. If you have one combined address field, map it to full_address_field.
-Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included,
-while the others are optional.
+4. Map the address fields to the name of the fields in the csv that you wish to process. 
+If you have one combined address field, map it to full_address_field. 
+Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
 
 Example, for a csv with the following fields:
 `addr_st, addr_city, addr_zip`
@@ -115,8 +126,7 @@ The output file will be saved in the same location as your input file, with _enr
 
 Note that you may see various warnings about a USPS and election file not being found, and about SSL certification. This is to be expected.
 
-One of the steps of the enrichment process is to check against Philadelphia's address information system (AIS). Please note that this process can take
-some time. It takes around 3-4 minutes to make 1,000 calls to AIS. Not all records will be checked against AIS -- just those that have no match in the `addresses.parquet` file.
+One of the steps of the enrichment process is to check against Philadelphia's address information system (AIS). Please note that this process can take some time. It takes around 3-4 minutes to make 1,000 calls to AIS. Not all records will be checked against AIS -- just those that have no match in the `addresses.parquet` file.
 So, it is important to provide an input file with as clean as an address field as possible, to minimize the number of times the script checks AIS.
 
 ## How The Geocoder Works
@@ -173,9 +183,6 @@ approximately 3-4 minutes.
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
-|`opa_account_num`|
-|`opa_address`|
-|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
@@ -184,7 +191,6 @@ approximately 3-4 minutes.
 |`political_division`|
 |`political_ward`|
 |`ppr_friends`|
-|`pwd_account_nums`|
 |`pwd_center_city_district`|
 |`pwd_maint_district`|
 |`pwd_parcel_id`|

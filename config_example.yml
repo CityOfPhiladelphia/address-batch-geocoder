@@ -4,7 +4,7 @@ AIS_API_KEY:
 
 # Input File Config
 input_file:
-geography_file: ./geocoder_address_data
+geography_file: ./geocoder_address_data/address_service_area_summary.parquet
 
 full_address_field:
 
