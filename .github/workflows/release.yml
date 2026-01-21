@@ -30,10 +30,15 @@ jobs:
         $outputExe = 'geocoder.exe'
         Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole
 
+    - name: Save Release Info
+      run: echo ${{ github.sha }} > release.txt
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
       with:
-        files: geocoder.exe
+        files: |
+          geocoder.exe 
+          release.txt
         draft: false
         prerelease: false
         generate_release_notes: true
