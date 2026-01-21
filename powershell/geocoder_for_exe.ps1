@@ -5,7 +5,6 @@ $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 # Paths needed for script
 $installFolder      = Join-Path $ScriptDirectory 'address-geocoder-main'
 $dataDirectory      = Join-Path $ScriptDirectory 'geocoder_address_data'
-$s3URL              = 'https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv'
 $s3URL              = 'https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz'
 $addressFileGZ      = Join-Path $dataDirectory   'address_service_area_summary.csv.gz'
 $addressFileCSV     = Join-Path $dataDirectory   'address_service_area_summary.csv'
@@ -403,15 +402,10 @@ function downloadAddressFile {
     if (-Not (Test-Path $addressFileParquet)) {   
         Write-Host "Converting address csv into a parquet file for speed and space optimization" -ForegroundColor Yellow
         
-        $process = Start-Process -FilePath $venvPython `
-            -ArgumentList @("-u", $toParquetPy, "--input_path", $addressFileCSV, "--output_path", $addressFileParquet) `
-            -WorkingDirectory $ScriptDirectory `
-            -NoNewWindow `
-            -Wait `
-            -PassThru
+        & $venvPython -u $toParquetPy --input_path $addressFileCSV --output_path $addressFileParquet
         
         # Check if conversion failed
-        if ($process.ExitCode -ne 0) {
+        if ($LASTEXITCODE -ne 0) {
             Write-Host "Failed to convert address file into the proper format." -ForegroundColor Red
             
             # Remove partial parquet file if it exists
@@ -419,7 +413,7 @@ function downloadAddressFile {
                 Remove-Item $addressFileParquet -Force
             }
             
-            exit 1
+            throw "CSV to Parquet conversion failed with exit code $LASTEXITCODE"
         }
     }
 
@@ -471,11 +465,10 @@ if ($script:RepoWasJustCloned) {
     Write-Host "`nRunning geocoder..." -ForegroundColor Green
 
     try {
-        Start-Process -FilePath $venvPython `
-            -ArgumentList @("-u", $geocoderPy) `
-            -WorkingDirectory $ScriptDirectory `
-            -NoNewWindow `
-            -Wait
+        & $venvPython -u $geocoderPy
+        if ($LASTEXITCODE -ne 0) {
+            throw "Geocoder exited with code $LASTEXITCODE"
+        }
     }
     catch {
         Write-Host "`n========== ERROR ==========" -ForegroundColor Red
