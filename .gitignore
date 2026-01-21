@@ -208,6 +208,11 @@ __marimo__/
 
 # Test Files
 data/
+geocoder_address_data/
+address_*.csv
+
+# Executable FIles
+*\.exe
 
 # Config Files
 config.yml
