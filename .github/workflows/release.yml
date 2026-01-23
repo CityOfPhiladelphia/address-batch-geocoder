@@ -31,14 +31,19 @@ jobs:
         Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false
 
     - name: Save Release Info
-      run: echo ${{ github.sha }} > release.txt
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}"
+        $version | Out-File -FilePath "powershell/release.txt" -Encoding UTF8 -NoNewline
+        Write-Host "Created powershell/release.txt with version: $version"
+    
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       if: github.ref_type == 'tag'
       with:
         files: |
-          geocoder.exe 
-          release.txt
+          geocoder.exe
+          powershell/release.txt
         draft: false
         prerelease: false
         generate_release_notes: true
