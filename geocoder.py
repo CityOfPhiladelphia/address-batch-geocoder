@@ -408,9 +408,9 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
 @click.command()
 @click.option(
     "--config_path",
-    default="config.yml",
+    default="./config.yml",
     prompt=True,
-    show_default="config.yml",
+    show_default="./config.yml",
     help="The path to the config file.",
 )
 def process_csv(config_path) -> pl.LazyFrame:
