@@ -587,6 +587,24 @@ def process_csv(config_path) -> pl.LazyFrame:
             )
         )
 
+        # Reorder fields so that lat/lon are adjacent
+        final_cols = rejoined.collect_schema().names()
+
+        cols_without_geo = [c for c in final_cols if c not in ["geocode_lat", "geocode_lon"]]
+        
+        if "match_type" in cols_without_geo:
+            insert_idx = cols_without_geo.index("match_type") + 1
+        else:
+            insert_idx = 0
+        
+        ordered_cols = (
+            cols_without_geo[:insert_idx] + 
+            ["geocode_lat", "geocode_lon"] + 
+            cols_without_geo[insert_idx:]
+        )
+        
+        rejoined = rejoined.select(ordered_cols)
+        
         # -------------------- Save Output File ---------------------- #
 
         in_path = PurePath(original_filepath)
