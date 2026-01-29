@@ -222,3 +222,6 @@ old/
 
 # Wheelhouse
 wheelhouse/
+
+# Release data
+*release.txt

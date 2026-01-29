@@ -22,9 +22,9 @@ First, you will need to download and install the geocoder.
 
 The geocoder file can be downloaded from GitHub. The latest release can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/
 
-Read through the notes carefully, and then download `geocoder.exe` at the bottom of the readme.
+Read through the notes carefully, and then download the zip file at the bottom of the readme.
 
-Once `geocoder.exe` is downloaded, move it into a folder where you can easily find it. The folder **must not** have spaces in its name.
+Extract the zip folder into a folder where you can easily find it. The folder **must not** have spaces in its name. The zip folder contains two files: `geocoder.exe` and `release.txt`. If you delete or rename these files, you will need to download them again or rename them back. Deleting `release.txt` will stop the program from being able to inform you if there is a new version of the `.exe` file that you need to download.
 
 Double-clicking `geocoder.exe` will launch the program. As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
 
