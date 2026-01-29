@@ -160,7 +160,7 @@ function installUv {
         
         try {
             # Install uv using official installer
-            wget -qO- https://astral.sh/uv/install.sh | sh
+            powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
             
             # Refresh path
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -194,7 +194,7 @@ function createVenvAndConfig {
         catch {
             #Output of this presents as an error for some reason even
             # when it executed successfully
-            
+
         }
     } else {
         Write-Host "Virtual environment already exists."
