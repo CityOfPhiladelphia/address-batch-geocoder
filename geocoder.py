@@ -168,7 +168,7 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     ]
 
     # Need street_address for joining
-    address_file_fields.extend(["street_address", "geocode_lat", "geocode_lon"])
+    address_file_fields.extend(["street_address", "geocode_lat", "geocode_lon", "geocode_x", "geocode_y"])
 
     # Avoid issues if user specifies a field more than once
     return (set(ais_enrichment_fields), set(address_file_fields))
@@ -273,6 +273,8 @@ def enrich_with_ais(
             pl.Field("is_philly_addr", pl.Boolean),
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String),
+            pl.Field("geocode_x", pl.String),
+            pl.Field("geocode_y", pl.String),
             pl.Field("is_multiple_match", pl.Boolean),
             pl.Field("match_type", pl.String),
             *[pl.Field(field, pl.String) for field in enrichment_fields],
@@ -366,6 +368,8 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
             pl.Field("output_address", pl.String),
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String),
+            pl.Field("geocode_x", pl.String),
+            pl.Field("geocode_y", pl.String),
             pl.Field("match_type", pl.String),
             pl.Field("is_addr", pl.Boolean),
             pl.Field("is_philly_addr", pl.Boolean),
@@ -424,6 +428,9 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     Returns: A polars lazy dataframe
     """
+    current_time = get_current_time()
+    print(f"Beginning enrichment process at {current_time}.")
+    
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -487,19 +494,6 @@ def process_csv(config_path) -> pl.LazyFrame:
             "full_address"
         ) or address_fields.get("street")
 
-        current_time = get_current_time()
-        print(f"Joining addresses to address file at {current_time}.")
-        # # Concatenate address fields, strip extra spaces
-        # lf = lf.with_columns(
-        #     pl.concat_str(
-        #         [pl.col(field).fill_null("") for field in address_fields_list],
-        #         separator=" ",
-        #     )
-        #     .str.replace_all(r"\s+", " ")
-        #     .str.strip_chars()
-        #     .alias("joined_address")
-        # )
-
         parser = PassyunkParser()
 
         lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
@@ -534,8 +528,6 @@ def process_csv(config_path) -> pl.LazyFrame:
             lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
 
         # ---------------- Split out Non Philly Addresses -------------------#
-        current_time = get_current_time()
-        print(f"Identifying non-Philadelphia addresses at {current_time}.")
         philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
 
         # Generate the names of columns to add for both the AIS API
@@ -552,9 +544,6 @@ def process_csv(config_path) -> pl.LazyFrame:
         # and attempt to match them with the AIS API
 
         # -------------------------- Add Fields from AIS ------------------ #
-        current_time = get_current_time()
-        print(f"Adding fields from AIS at {get_current_time()}")
-
         has_geo, needs_geo = split_geos(joined_lf)
 
         uses_full_address = bool(address_fields.get("full_address"))
@@ -567,9 +556,6 @@ def process_csv(config_path) -> pl.LazyFrame:
         # -------------- Check Match Failures Against TomTom ------------------ #
 
         has_geo, needs_geo = split_geos(ais_rejoined)
-
-        current_time = get_current_time()
-        print(f"Adding fields from TomTom at {get_current_time()}")
 
         # Rejoin the addresses marked as non-philly for tomtom search
         # at the beginning of the process
@@ -587,19 +573,22 @@ def process_csv(config_path) -> pl.LazyFrame:
             )
         )
 
-        # Reorder fields so that lat/lon are adjacent
+        # Reorder fields so that all geocode fields are adjacent
         final_cols = rejoined.collect_schema().names()
 
-        cols_without_geo = [c for c in final_cols if c not in ["geocode_lat", "geocode_lon"]]
+        # Remove all geocode columns from the list
+        geo_cols = ["geocode_lat", "geocode_lon", "geocode_x", "geocode_y"]
+        cols_without_geo = [c for c in final_cols if c not in geo_cols]
         
         if "match_type" in cols_without_geo:
             insert_idx = cols_without_geo.index("match_type") + 1
         else:
             insert_idx = 0
         
+        # Insert all geocode columns together after match_type
         ordered_cols = (
             cols_without_geo[:insert_idx] + 
-            ["geocode_lat", "geocode_lon"] + 
+            geo_cols + 
             cols_without_geo[insert_idx:]
         )
         
