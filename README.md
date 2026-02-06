@@ -1,5 +1,5 @@
 # address-geocoder
-A tool to standardize and geocode Philadelphia addresses. Four geocode fields are returned: geocode_lat and geocode_lon are in the EPSG:4326 coordinate system, and geocode_x and geocode_y are in the EPSG:2272 coordinate system.
+A tool to standardize and geocode Philadelphia addresses. Four geocode fields are returned: `geocode_lat` and `geocode_lon` are in the EPSG:4326 coordinate system, and `geocode_x` and `geocode_y` are in the EPSG:2272 coordinate system.
 
 ## 1. Setup
 You will need the following things:
