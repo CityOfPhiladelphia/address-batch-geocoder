@@ -71,6 +71,8 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
+        "geocode_x": None,
+        "geocode_y": None,
         "is_addr": False,
         "is_philly_addr": False,
         "output_address": "1234 FAKE ST",

@@ -20,6 +20,8 @@ def test_build_enrichment_fields_returns_fields():
             "street_address",
             "geocode_lat",
             "geocode_lon",
+            "geocode_x",
+            "geocode_y"
         },
     )
 

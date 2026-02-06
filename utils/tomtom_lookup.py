@@ -43,7 +43,6 @@ def tomtom_lookup(
         raise Exception("5xx response. There may be a problem with TomtomAPI server.")
     # 429 response indicates we're being blocked by the API.
     elif response.status_code == 429:
-        print(response.text)
         raise Exception(
             "429 response. Too many API callsto TomTom in a short amount of time."
         )
@@ -79,9 +78,50 @@ def tomtom_lookup(
             out_data["output_address"] = parsed_address if parsed_address else address
             out_data["geocode_lat"] = str(lat)
             out_data["geocode_lon"] = str(lon)
+            out_data["geocode_x"] = None
+            out_data["geocode_y"] = None
             out_data["match_type"] = "tomtom"
             out_data["is_addr"] = True
             out_data["is_philly_addr"] = is_philly_addr
+
+            # ---- Make Second Request to Get SRID 2272 ---- #
+            # Need to specify json format, HTML by default
+            params = {"Address": address, "f": "pjson", "outSR": "2272"}
+
+            TOMTOM_RATE_LIMITER.wait()
+            response = sess.get(tomtom_url, params=params, timeout=10)
+
+            if response.status_code >= 500:
+                raise Exception("5xx response. There may be a problem with TomTom API server.")
+            
+            # 429 response indicates we're being blocked by the API.
+            elif response.status_code == 429:
+                raise Exception(
+                    "429 response. Too many API calls to TomTom in a short amount of time."
+                )
+            
+            if response.status_code == 200:
+                # TomTom returns an empty list if no addresses match
+                if response.json().get("candidates"):
+                    # First response should be most probable match,
+                    # so hopefully no need to tiebreak.
+                    r_json = response.json()["candidates"][0]
+
+                    try:
+                        geo_x = r_json["location"]["x"]
+                        geo_y = r_json["location"]["y"]
+                        out_data["geocode_x"] = str(geo_x)
+                        out_data["geocode_y"] = str(geo_y)
+
+                    except KeyError:
+                        out_data["geocode_x"] = None
+                        out_data["geocode_y"] = None
+                else:
+                    out_data["geocode_x"] = None
+                    out_data["geocode_y"] = None
+            else:
+                out_data["geocode_x"] = None
+                out_data["geocode_y"] = None
 
             return out_data
 
@@ -90,6 +130,8 @@ def tomtom_lookup(
     out_data["output_address"] = fallback_addr if fallback_addr else address
     out_data["geocode_lat"] = None
     out_data["geocode_lon"] = None
+    out_data["geocode_x"] = None
+    out_data["geocode_y"] = None
     out_data["match_type"] = None
     out_data["is_addr"] = False
     out_data["is_philly_addr"] = False

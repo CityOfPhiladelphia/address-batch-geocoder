@@ -86,7 +86,7 @@ def make_coordinate_lookups(
         response = sess.get(ais_url, params=params, timeout=10, verify=False)
 
         if response.status_code >= 500:
-            raise Exception("5xx response. There may be a problem with theAIS API.")
+            raise Exception("5xx response. There may be a problem with the AIS API.")
         elif response.status_code == 429:
             print(response.text)
             raise Exception("429 response. Too many calls to the AIS API.")
@@ -162,10 +162,10 @@ def ais_lookup(
     params = {}
     params["gatekeeperKey"] = api_key
 
-    response = sess.get(ais_url, verify=False)
+    response = sess.get(ais_url, params=params, verify=False)
 
     if response.status_code >= 500:
-        raise Exception("5xx response. There may be a problem with theAIS API.")
+        raise Exception("5xx response. There may be a problem with the AIS API.")
     elif response.status_code == 429:
         print(response.text)
         raise Exception("429 response. Too many calls to the AIS API.")
@@ -201,6 +201,8 @@ def ais_lookup(
             out_data["is_philly_addr"] = True
             out_data["geocode_lat"] = None
             out_data["geocode_lon"] = None
+            out_data["geocode_x"] = None
+            out_data["geocode_y"] = None
             out_data["is_multiple_match"] = True
             out_data["match_type"] = "ais"
 
@@ -219,13 +221,16 @@ def ais_lookup(
                 lon, lat = tiebroken_address["geometry"]["coordinates"]
 
             except KeyError:
-                lon, lat = ""
+                lon, lat = "", ""
 
             out_data["output_address"] = out_address if out_address else address
             out_data["is_addr"] = True
             out_data["is_philly_addr"] = True
             out_data["geocode_lat"] = str(lat)
             out_data["geocode_lon"] = str(lon)
+            # Set placeholders for x and y to preserve order
+            out_data["geocode_x"] = None
+            out_data["geocode_y"] = None
             out_data["is_multiple_match"] = False
             out_data["match_type"] = "ais"
 
@@ -240,7 +245,38 @@ def ais_lookup(
 
                 else:
                     out_data[field] = str(field_value)
+            
+            # Make second call for SRID 2272 coordinates
+            # Use formatted output address for the search
+            AIS_RATE_LIMITER.wait()
+            ais_url_2272 = "https://api.phila.gov/ais/v1/search/" + quote(out_address) + f"?gatekeeperKey={api_key}&srid=2272&max_range=0"
+            response_2272 = sess.get(ais_url_2272, params=params, verify=False)
 
+            if response_2272.status_code >= 500:
+                raise Exception("5xx response. There may be a problem with the AIS API.")
+            elif response_2272.status_code == 429:
+                raise Exception("429 response. Too many calls to the AIS API.")
+            elif response_2272.status_code == 200:
+                r_json_2272 = response_2272.json()
+                
+                # Get the first feature (should match since we're using the standardized address)
+                if r_json_2272.get("features") and len(r_json_2272["features"]) > 0:
+                    feature_2272 = r_json_2272["features"][0]
+                    try:
+                        geo_x, geo_y = feature_2272["geometry"]["coordinates"]
+                        out_data["geocode_x"] = str(geo_x).strip("'")
+                        out_data["geocode_y"] = str(geo_y).strip("'")
+                    except (KeyError, TypeError):
+                        out_data["geocode_x"] = None
+                        out_data["geocode_y"] = None
+                else:
+                    out_data["geocode_x"] = None
+                    out_data["geocode_y"] = None
+            else:
+                # If 2272 call fails, set to None
+                out_data["geocode_x"] = None
+                out_data["geocode_y"] = None
+            
             return out_data
 
     # If no match, return none but preserve existing address validity flags
@@ -250,6 +286,8 @@ def ais_lookup(
     out_data["is_philly_addr"] = existing_is_philly_addr
     out_data["geocode_lat"] = None
     out_data["geocode_lon"] = None
+    out_data["geocode_x"] = None
+    out_data["geocode_y"] = None
     out_data["is_multiple_match"] = False
     out_data["match_type"] = None
 

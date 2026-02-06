@@ -62,10 +62,13 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         original_address="1234 mkt st",
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
+    assert created["url"] in("https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0",\
+                              "https://api.phila.gov/ais/v1/search/1234%20MARKET%20ST?gatekeeperKey=1234&srid=2272&max_range=0")
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
+        "geocode_x": "-75.16",
+        "geocode_y": "39.95",
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
@@ -135,10 +138,13 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         original_address="1234 mkt st",
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
+    assert created["url"] in("https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0",\
+                              "https://api.phila.gov/ais/v1/search/1234%20N%20MARKET%20ST?gatekeeperKey=1234&srid=2272&max_range=0")
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
+        "geocode_x": "-75.16",
+        "geocode_y": "39.95",
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 N MARKET ST",
@@ -212,6 +218,8 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
+        "geocode_x": None,
+        "geocode_y": None,
         "is_addr": False,
         "is_philly_addr": True,
         "output_address": "1234 mkt st",
@@ -266,6 +274,8 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
+        "geocode_x": None,
+        "geocode_y": None,
         "is_addr": False,
         "is_philly_addr": False,
         "output_address": "123 fake st",
