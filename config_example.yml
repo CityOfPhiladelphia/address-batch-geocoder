@@ -25,3 +25,7 @@ enrichment_fields:
   # ADD MORE FIELDS BELOW, EG: 
   # - census_tract_2010
   # - seg_id
+
+# Which SRIDs to return for geocoding
+srid_4326: true
+srid_2272: true
