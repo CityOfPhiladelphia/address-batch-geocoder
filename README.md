@@ -134,7 +134,7 @@ srid_4326: true
 srid_2272: true
 ``` 
 
-6. You're now ready to run the geocoder:
+7. You're now ready to run the geocoder:
 
 ```
 python3 geocoder.py
