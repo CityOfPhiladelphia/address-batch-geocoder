@@ -89,6 +89,13 @@ enrichment_fields:
   - census_block_group_2020
   - census_block_2020
 ```
+6. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
+
+```
+# Which SRIDs to return for geocoding
+srid_4326: true
+srid_2272: true
+```
 
 The full config file should look something like this:
 ```
@@ -115,7 +122,7 @@ enrichment_fields:
   - census_block_2020
 ```
 
-6. You're now ready to run the geocoder.
+7. You're now ready to run the geocoder.
 
 Double-click `geocoder.exe` -- the same file that you used to instal geocoder.
 
