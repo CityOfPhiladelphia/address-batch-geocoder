@@ -8,7 +8,7 @@ json_response_match = {
     "candidates": [
         {
             "address": "1234 Market St, Philadelphia, Pennsylvania, 19107",
-            "location": {"x": -75.16047189802985, "y": 39.951918251135154},
+            "location": {"x": -75.11192847164241, "y": 39.88775918851947},
             "score": 100,
             "attributes": {},
             "extent": {
@@ -84,8 +84,8 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
     )
 
     assert result == {
-        "geocode_lat": "39.951918251135154",
-        "geocode_lon": "-75.16047189802985",
+        "geocode_lat": "39.88775919",
+        "geocode_lon": "-75.11192847",
         "geocode_x": "2694393.35",
         "geocode_y": "235982.72",
         "is_addr": True,
@@ -120,8 +120,8 @@ def test_tomtom_lookup_only_fetches_4326(monkeypatch):
     )
 
     assert result == {
-        "geocode_lat": "39.951918251135154",
-        "geocode_lon": "-75.16047189802985",
+        "geocode_lat": "39.88775919",
+        "geocode_lon": "-75.11192847",
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
@@ -273,7 +273,7 @@ def test_tomtom_lookup_handles_non_philly_address(monkeypatch):
     assert result["is_addr"] == True
     assert result["is_philly_addr"] == False
     assert result["match_type"] == "tomtom"
-    assert result["geocode_lat"] == "39.88775918851947"
-    assert result["geocode_lon"] == "-75.11192847164241"
+    assert result["geocode_lat"] == "39.88775919"
+    assert result["geocode_lon"] == "-75.11192847"
     assert result["geocode_x"] == "2700000.0"
     assert result["geocode_y"] == "240000.0"

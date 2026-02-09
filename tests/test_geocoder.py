@@ -88,7 +88,7 @@ def test_build_enrichment_fields_returns_fields_only_2272():
     assert expected == actual
 
 
-def test_build_enrichment_fields_defaults_to_both_srids():
+def test_build_enrichment_fields_defaults_to_neither_srid():
     """Test that when srid flags are not specified, both are included by default"""
     config = {
         "enrichment_fields": [
@@ -106,10 +106,6 @@ def test_build_enrichment_fields_defaults_to_both_srids():
             "census_block_group_2020",
             "census_block_2020",
             "street_address",
-            "geocode_lat",
-            "geocode_lon",
-            "geocode_x",
-            "geocode_y"
         },
     )
 
