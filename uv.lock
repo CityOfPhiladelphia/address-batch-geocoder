@@ -50,7 +50,7 @@ requires-dist = [
     { name = "ruff", specifier = ">=0.14.9" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "usaddress", specifier = ">=0.5.16" },
-    { name = "wheel", specifier = ">=0.45.1" },
+    { name = "wheel", specifier = ">=0.46.2" },
 ]
 
 [[package]]

@@ -123,6 +123,46 @@ def tiebreak_coordinate_lookups(responses: list[dict], zip: str):
     if addresses:
         return addresses[0]
 
+def _fetch_ais_coordinates(
+        sess: requests.Session,
+        api_key: str,
+        address: str,
+        zip: str,
+        srid: int
+):
+    """
+    Fetches coordinates for a specific SRID. Returns (coord1, coord2) or
+    (None, None) if failed.
+    """
+
+    AIS_RATE_LIMITER.wait()
+    ais_url = f"https://api.phila.gov/ais/v1/search/{quote(address)}?gatekeeperKey={api_key}&srid={srid}&max_range=0"
+
+    response = sess.get(ais_url, verify=False)
+
+    if response.status_code >= 500:
+        raise Exception("5xx response. There may be a problem with the AIS API.")
+    elif response.status_code == 429:
+        raise Exception("429 response. Too many calls to the AIS API.")
+    elif response.status_code == 200:
+        r_json = response.json()
+
+        if r_json.get("features") and len(r_json["features"]) > 0:
+            feature = r_json["features"][0]
+
+            # Tiebreak if multiple results
+            if len(r_json["features"]) > 1:
+                feature = tiebreak(response, zip)
+                if not feature:
+                    return None, None
+                
+            try:
+                coord1, coord2 = feature["geometry"]["coordinates"]
+                return str(coord1), str(coord2)
+            except (KeyError, TypeError):
+                return None, None
+            
+        return None, None
 
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
@@ -141,6 +181,8 @@ def ais_lookup(
     existing_is_addr: bool = False,
     existing_is_philly_addr: bool = False,
     original_address: str = None,
+    fetch_4326: bool = True,
+    fetch_2272: bool = True,
 ) -> dict:
     """
     Given a passyunk-normalized address, looks up whether or not it is in the
@@ -152,6 +194,8 @@ def ais_lookup(
         address (str): The address to query
         zip (str): The zip code associated with the address, if present
         enrichment_fields (list): The fields to add from AIS
+        fetch_4326 (bool): Whether to fetch SRID 4326 coordinates (lat/lon)
+        fetch_2272 (bool): Whether to fetch SRID 2272 coordinates (x/y)
 
     Returns:
         A dict with standardized address, latitude and longitude,
@@ -217,66 +261,31 @@ def ais_lookup(
                 "street_address", ""
             )
 
-            try:
-                lon, lat = tiebroken_address["geometry"]["coordinates"]
-
-            except KeyError:
-                lon, lat = "", ""
-
             out_data["output_address"] = out_address if out_address else address
             out_data["is_addr"] = True
             out_data["is_philly_addr"] = True
-            out_data["geocode_lat"] = str(lat)
-            out_data["geocode_lon"] = str(lon)
-            # Set placeholders for x and y to preserve order
-            out_data["geocode_x"] = None
-            out_data["geocode_y"] = None
             out_data["is_multiple_match"] = False
             out_data["match_type"] = "ais"
 
+        # Fetch coordinates based on config
+            if fetch_4326:
+                try:
+                    lon, lat = tiebroken_address["geometry"]["coordinates"]
+                    out_data["geocode_lat"] = str(round(float(lat), 8))
+                    out_data["geocode_lon"] = str(round(float(lon), 8))
+                except KeyError:
+                    out_data["geocode_lat"] = None
+                    out_data["geocode_lon"] = None
+
+            if fetch_2272:
+                geo_x, geo_y = _fetch_ais_coordinates(sess, api_key, out_address, zip, 2272)
+                out_data["geocode_x"] = str(round(float(geo_x), 8))
+                out_data["geocode_y"] = str(round(float(geo_y), 8))
+
             for field in enrichment_fields:
                 field_value = tiebroken_address.get("properties", "").get(field, "")
+                out_data[field] = str(field_value) if field_value else None
 
-                # Explicitly checking for existence of field value handles
-                # cases where some fields (such as opa-owners) may be an
-                # empty list
-                if not field_value:
-                    out_data[field] = None
-
-                else:
-                    out_data[field] = str(field_value)
-            
-            # Make second call for SRID 2272 coordinates
-            # Use formatted output address for the search
-            AIS_RATE_LIMITER.wait()
-            ais_url_2272 = "https://api.phila.gov/ais/v1/search/" + quote(out_address) + f"?gatekeeperKey={api_key}&srid=2272&max_range=0"
-            response_2272 = sess.get(ais_url_2272, params=params, verify=False)
-
-            if response_2272.status_code >= 500:
-                raise Exception("5xx response. There may be a problem with the AIS API.")
-            elif response_2272.status_code == 429:
-                raise Exception("429 response. Too many calls to the AIS API.")
-            elif response_2272.status_code == 200:
-                r_json_2272 = response_2272.json()
-                
-                # Get the first feature (should match since we're using the standardized address)
-                if r_json_2272.get("features") and len(r_json_2272["features"]) > 0:
-                    feature_2272 = r_json_2272["features"][0]
-                    try:
-                        geo_x, geo_y = feature_2272["geometry"]["coordinates"]
-                        out_data["geocode_x"] = str(geo_x).strip("'")
-                        out_data["geocode_y"] = str(geo_y).strip("'")
-                    except (KeyError, TypeError):
-                        out_data["geocode_x"] = None
-                        out_data["geocode_y"] = None
-                else:
-                    out_data["geocode_x"] = None
-                    out_data["geocode_y"] = None
-            else:
-                # If 2272 call fails, set to None
-                out_data["geocode_x"] = None
-                out_data["geocode_y"] = None
-            
             return out_data
 
     # If no match, return none but preserve existing address validity flags
