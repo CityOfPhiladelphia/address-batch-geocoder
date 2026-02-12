@@ -293,12 +293,12 @@ def ais_lookup(
     out_data["output_address"] = original_address if original_address else address
     out_data["is_addr"] = existing_is_addr
     out_data["is_philly_addr"] = existing_is_philly_addr
+    out_data["is_multiple_match"] = False
+    out_data["match_type"] = None
     out_data["geocode_lat"] = None
     out_data["geocode_lon"] = None
     out_data["geocode_x"] = None
     out_data["geocode_y"] = None
-    out_data["is_multiple_match"] = False
-    out_data["match_type"] = None
 
     for field in enrichment_fields:
         out_data[field] = None
