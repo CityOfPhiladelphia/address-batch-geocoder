@@ -160,6 +160,9 @@ is not recommended. As an example, if you have a file that needs 1,000 rows to b
 approximately 3-4 minutes.
 5. The enriched file is then saved to the same directory as the input file.
 
+
+The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
+
 ## Testing
 This package uses the pytest module to conduct unit tests. Tests are
 located in the `tests/` folder.
