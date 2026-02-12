@@ -86,7 +86,7 @@ address_fields:
   zip: addr_zip
 ```
 5. List which fields other than latitude and longitude you want to add.
-(Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
+(Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again. Enrichment fields will only be populated for Philadelphia addresses that match to the address file, or are geocoded by the AIS API.
 A complete list of valid fields can be found further down in this README. 
 
 ```
@@ -197,6 +197,7 @@ git push origin v1.0.0
 ## Enrichment Fields
 Note that if any of the fields in the input file have the same name as
 an enrichment field, the incoming input file field will be renamed to have the _left suffix.
+Enrichment fields will only be populated for Philadelphia addresses that match to the address file, or are geocoded by the AIS API.
 
 | `Field` |
 | --- |
