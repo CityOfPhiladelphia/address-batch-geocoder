@@ -306,26 +306,26 @@ def enrich_with_ais(
     srid_2272 = config.get("srid_2272")
 
     struct_fields = [
-        pl.Field("output_address", pl.String),
-        pl.Field("is_addr", pl.Boolean),
-        pl.Field("is_philly_addr", pl.Boolean),
-    ]
+    pl.Field("output_address", pl.String),
+    pl.Field("is_addr", pl.Boolean),
+    pl.Field("is_philly_addr", pl.Boolean),
+    pl.Field("is_multiple_match", pl.Boolean),  # These come BEFORE geocode fields
+    pl.Field("match_type", pl.String),
+]
 
     if srid_4326:
         struct_fields.extend([
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String)
         ])
-    
+
     if srid_2272:
         struct_fields.extend([
             pl.Field("geocode_x", pl.String),
             pl.Field("geocode_y", pl.String),
         ])
-    
+
     struct_fields.extend([
-        pl.Field("is_multiple_match", pl.Boolean),
-        pl.Field("match_type", pl.String),
         *[pl.Field(field, pl.String) for field in enrichment_fields]
     ])
 
@@ -420,7 +420,12 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
     srid_4326 = config.get("srid_4326")
     srid_2272 = config.get("srid_2272")
 
-    struct_fields = [pl.Field("output_address", pl.String)]
+    struct_fields = [
+        pl.Field("output_address", pl.String),
+        pl.Field("match_type", pl.String),
+        pl.Field("is_addr", pl.Boolean),
+        pl.Field("is_philly_addr", pl.Boolean),
+    ]
 
     if srid_4326:
         struct_fields.extend([
@@ -434,12 +439,6 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
             pl.Field("geocode_y", pl.String)
         ])
     
-    struct_fields.extend([
-        pl.Field("match_type", pl.String),
-        pl.Field("is_addr", pl.Boolean),
-        pl.Field("is_philly_addr", pl.Boolean),
-    ])
-
     new_cols = pl.Struct(struct_fields)
     field_names = [f.name for f in new_cols.fields]
 
