@@ -1,4 +1,4 @@
-# address-geocoder
+# address-batch-geocoder
 A tool to standardize and geocode Philadelphia addresses. Four geocode fields are returned: `geocode_lat` and `geocode_lon` are in the EPSG:4326 coordinate system, and `geocode_x` and `geocode_y` are in the EPSG:2272 coordinate system.
 
 ## 1. Setup
@@ -9,7 +9,7 @@ You will need the following things:
 
 To download, use git:
 ```
-git clone git@github.com:CityOfPhiladelphia/address-geocoder.git
+git clone git@github.com:CityOfPhiladelphia/address-batch-geocoder.git
 ```
 If you have not set up authentication with git on your machine before, reference this [guidance on GitHub](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 
@@ -146,7 +146,7 @@ keep the default config file ('./config.yml')
 The output file will be saved in the same location as your input file, with _enriched attached to the filename.
 
 ## How The Geocoder Works
-`Address-Geocoder` processes a csv file with addresses, and geolocates those
+`Address-Batch-Geocoder` processes a csv file with addresses, and geolocates those
 addresses using the following steps:
 
 1. Takes an input file of addresses, and standardizes those 
@@ -154,7 +154,7 @@ addresses using `passyunk`, Philadelphia's address standardization system.
 2. Compares the standardized data to a local parquet file, `addresses.parquet`,
 and adds the user-specified fields as well as latitude and longitude from that file
 3. Not all records will match to the address file. For those records that do not match,
-`Address-Geocoder` queries the Address Information System (AIS) API and adds returned fields.
+`Address-Batch-Geocoder` queries the Address Information System (AIS) API and adds returned fields.
 Please note that this process can take some time, so processing large files with a messy address field
 is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take
 approximately 3-4 minutes.
