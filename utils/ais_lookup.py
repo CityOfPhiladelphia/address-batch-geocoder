@@ -243,10 +243,15 @@ def ais_lookup(
             out_data["output_address"] = normalized_addr if normalized_addr else address
             out_data["is_addr"] = False
             out_data["is_philly_addr"] = True
-            out_data["geocode_lat"] = None
-            out_data["geocode_lon"] = None
-            out_data["geocode_x"] = None
-            out_data["geocode_y"] = None
+
+            if fetch_4326:
+                out_data["geocode_lat"] = None
+                out_data["geocode_lon"] = None
+
+            if fetch_2272:
+                out_data["geocode_x"] = None
+                out_data["geocode_y"] = None
+            
             out_data["is_multiple_match"] = True
             out_data["match_type"] = "ais"
 
@@ -295,10 +300,14 @@ def ais_lookup(
     out_data["is_philly_addr"] = existing_is_philly_addr
     out_data["is_multiple_match"] = False
     out_data["match_type"] = None
-    out_data["geocode_lat"] = None
-    out_data["geocode_lon"] = None
-    out_data["geocode_x"] = None
-    out_data["geocode_y"] = None
+
+    if fetch_4326:
+        out_data["geocode_lat"] = None
+        out_data["geocode_lon"] = None
+
+    if fetch_2272:
+        out_data["geocode_x"] = None
+        out_data["geocode_y"] = None
 
     for field in enrichment_fields:
         out_data[field] = None

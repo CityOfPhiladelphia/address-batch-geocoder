@@ -403,18 +403,20 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
 
     Args:
         parser: A passyunk parser object. Used to standardize TomTom output.
+        config: A dictionary containing config information
         to_add: A polars lazyframe to be enriched
 
     Returns:
-        An enriched polars layzframe.
+        An enriched polars lazyframe.
     """
 
-    # Created augmented address for undefined locations
+    # Create augmented address for undefined locations
+    
     to_add = to_add.with_columns(
         pl.when(pl.col("is_undefined") & pl.col("is_addr"))
-        .then(pl.concat_str([pl.col("joined_address"), pl.lit(", Philadelphia, PA")]))
-        .otherwise(pl.col("joined_address"))
-        .alias("api_address")
+        .then(pl.concat_str([pl.col("raw_address"), pl.lit(", Philadelphia, PA")]))
+        .otherwise(pl.col("raw_address"))
+        .alias("raw_api_address")
     )
 
     srid_4326 = config.get("srid_4326")
@@ -445,19 +447,19 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
     with requests.Session() as sess:
         with pl.Config(set_streaming_chunk_size=1):
             added = (
-                # Use the joined address for tomtom, as passyunk parser strips
-                # state, city information
+                # Use the joined raw (not parsed with passyunk) address for tomtom, as passyunk parser 
+                # may sometimes strip out key information
                 to_add.with_columns(
-                    pl.struct(["api_address", "output_address"])
+                    pl.struct(["raw_api_address", "output_address"])
                     .map_elements(
                         lambda cols: tomtom_lookup(
                             sess,
                             parser,
                             ZIPS,
-                            cols["api_address"],
+                            cols["raw_api_address"],
                             cols["output_address"],
                             srid_4326,
-                            srid_2272
+                            srid_2272,
                         ),
                         return_dtype=new_cols,
                     )
@@ -469,7 +471,7 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
                         for n in field_names
                     ]
                 )
-                .drop("tomtom_struct", "api_address")
+                .drop("tomtom_struct", "raw_api_address")
             )
 
     return added
@@ -570,6 +572,11 @@ def process_csv(config_path) -> pl.LazyFrame:
         ) or address_fields.get("street")
 
         parser = PassyunkParser()
+        
+        # Create raw address field, used later to attempt to match
+        # raw address against TomTom if the passyunk parsed address
+        # fails to match
+        lf = lf.with_columns(pl.col(passyunk_address_field).alias("raw_address"))
 
         lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
 
@@ -596,7 +603,14 @@ def process_csv(config_path) -> pl.LazyFrame:
                     .str.strip_chars()
                 )
                 .otherwise(pl.col(passyunk_address_field))
-                .alias("joined_address")
+                .alias("joined_address"),
+
+                pl.concat_str(
+                [pl.col("raw_address")] + location_components,
+                separator=" ",
+                ).str.replace_all(r"\s+", " ")\
+                    .str.strip_chars()\
+                        .alias("raw_address"),  # overwrite raw_address in place
             )
         else:
             # For full_address cases, use the original field as joined_address
@@ -644,7 +658,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             pl.concat([has_geo, tomtom_enriched])
             .sort("__geocode_idx__")
             .drop(
-                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"]
+                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"]
             )
         )
 
@@ -673,6 +687,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             cols_without_geo[insert_idx:]
         )
         
+        # Drop raw address field, no longer need it after tomtom match
         rejoined = rejoined.select(ordered_cols)
         
         # -------------------- Save Output File ---------------------- #
