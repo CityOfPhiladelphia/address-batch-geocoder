@@ -654,8 +654,43 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         tomtom_enriched = enrich_with_tomtom(parser, config, needs_geo)
 
+        # -------------- Check TomTom matches against AIS again ---------------- #
+        
+        # This melted my brain a little bit so I'm writing it out here:
+        # 1. We see which records that TomTom failed to match are in Philly
+        # 2. We reinrich those with AIS to see if the new TomTom parsed address is
+        # searchable with AIS, allowing us to potentially recover enrichment fields
+        # 3. That either geocodes or doesn't. We take the records that AIS failed to geocode.
+        # 4. We use the tomtom matched record for the records that AIS failed to geocode.
+        # 5. We rejoin those to the records that AIS did manage to reinrich
+        # 6. We rejoin those records to the non-philadelphia records that shouldn't be run through AIS
+        # 7. We rejoin that again back to the original 'has_geo' -- the records that never needed
+        # to be matched to TomTom in the first place.
+
+        tomtom_enriched_non_philly = tomtom_enriched.filter(pl.col("is_non_philly"))
+        tomtom_enriched_is_philly = tomtom_enriched.filter(~pl.col("is_non_philly"))
+
+        ais_reinriched = enrich_with_ais(config, tomtom_enriched_is_philly, uses_full_address, ais_enrichment_fields)
+
+        reinriched_has_geo, reinriched_needs_geo = split_geos(ais_reinriched, config)
+
+        # Indicate that the record was geocoded with a combination of tomtom and AIS
+        reinriched_has_geo = reinriched_has_geo.with_columns(
+            pl.col("geocoder_used").str.replace("ais", "tomtom-ais").alias("geocoder_used")
+        )
+
+        failed_idx = reinriched_needs_geo.select("__geocode_idx__")
+        
+        tomtom_fallback = tomtom_enriched.join(failed_idx, on="__geocode_idx__", how="inner")
+
+        cols = tomtom_enriched.collect_schema().names()
+
+        # Make sure rejoined tables have same fields in same order
+        reinriched_rejoined = pl.concat([reinriched_has_geo, tomtom_fallback], how="diagonal").select(cols)
+        non_philly_rejoined = pl.concat([tomtom_enriched_non_philly, reinriched_rejoined], how="diagonal").select(cols)
+
         rejoined = (
-            pl.concat([has_geo, tomtom_enriched])
+            pl.concat([has_geo, non_philly_rejoined])
             .sort("__geocode_idx__")
             .drop(
                 ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"]
