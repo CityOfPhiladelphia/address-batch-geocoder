@@ -43,7 +43,7 @@ def _do_tomtom_lookup(
     address: str,
     fetch_4326: bool,
     fetch_2272: bool,
-    match_type: str = "tomtom",
+    geocoder_used: str = "tomtom",
 ) -> dict:
     """
     Makes a single TomTom request and returns a populated out_data dict,
@@ -75,7 +75,7 @@ def _do_tomtom_lookup(
 
         out_data = {}
         out_data["output_address"] = parsed_address if parsed_address else matched_address
-        out_data["match_type"] = match_type
+        out_data["geocoder_used"] = geocoder_used
         out_data["is_addr"] = True
         out_data["is_philly_addr"] = is_philly_addr
 
@@ -139,7 +139,7 @@ def tomtom_lookup(
     # Truly no match
     out_data = {
         "output_address": fallback_addr if fallback_addr else address,
-        "match_type": None,
+        "geocoder_used": None,
         "is_addr": False,
         "is_philly_addr": False,
     }

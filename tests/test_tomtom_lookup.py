@@ -91,7 +91,7 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "tomtom",
+        "geocoder_used": "tomtom",
     }
 
 
@@ -125,7 +125,7 @@ def test_tomtom_lookup_only_fetches_4326(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "tomtom",
+        "geocoder_used": "tomtom",
     }
     # Ensure geocode_x and geocode_y are not in result
     assert "geocode_x" not in result
@@ -170,7 +170,7 @@ def test_tomtom_lookup_only_fetches_2272(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "tomtom",
+        "geocoder_used": "tomtom",
     }
     # Ensure geocode_lat and geocode_lon are not in result
     assert "geocode_lat" not in result
@@ -215,7 +215,7 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
         "is_addr": False,
         "is_philly_addr": False,
         "output_address": "1234 FAKE ST",
-        "match_type": None,
+        "geocoder_used": None,
     }
 
 
@@ -272,7 +272,7 @@ def test_tomtom_lookup_handles_non_philly_address(monkeypatch):
 
     assert result["is_addr"] == True
     assert result["is_philly_addr"] == False
-    assert result["match_type"] == "tomtom"
+    assert result["geocoder_used"] == "tomtom"
     assert result["geocode_lat"] == "39.88775919"
     assert result["geocode_lon"] == "-75.11192847"
     assert result["geocode_x"] == "2700000.0"
