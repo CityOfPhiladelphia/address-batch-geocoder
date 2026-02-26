@@ -580,6 +580,42 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
 
+        # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
+        # Only do this for split address fields (street/city/state/zip)
+        # Don't do this for full_address fields, as Passyunk strips city/state
+        if "street" in address_fields.keys():
+            # Build list of available location components
+            location_components = []
+            for key in ["city", "state", "zip"]:
+                if key in address_fields.keys() and address_fields[key] is not None:
+                    location_components.append(
+                        pl.col(address_fields[key]).fill_null("")
+                    )
+
+            lf = lf.with_columns(
+                pl.when(pl.col("output_address").is_not_null())
+                .then(
+                    pl.concat_str(
+                        [pl.col("output_address")] + location_components,
+                        separator=" ",
+                    )
+                    .str.replace_all(r"\s+", " ")
+                    .str.strip_chars()
+                )
+                .otherwise(pl.col(passyunk_address_field))
+                .alias("joined_address"),
+
+                pl.concat_str(
+                [pl.col("raw_address")] + location_components,
+                separator=" ",
+                ).str.replace_all(r"\s+", " ")\
+                    .str.strip_chars()\
+                        .alias("raw_address"),  # overwrite raw_address in place
+            )
+        else:
+            # For full_address cases, use the original field as joined_address
+            lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
+
         # ---------------- Split out Non Philly Addresses -------------------#
         philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
 
@@ -622,7 +658,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             pl.concat([has_geo, tomtom_enriched])
             .sort("__geocode_idx__")
             .drop(
-                ["__geocode_idx__", "is_non_philly", "is_undefined", "raw_address"]
+                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"]
             )
         )
 
