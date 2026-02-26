@@ -1,19 +1,9 @@
-import requests, re
+import requests
 from .rate_limiter import RateLimiter
 from retrying import retry
 from .parse_address import tag_full_address, flag_non_philly_address
 
 TOMTOM_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
-
-def _has_house_number(address: str) -> bool:
-    """Check if an address string contains a house number. Used to 
-    determine whether or not Passyunk has stripped a house number
-    from the address."""
-
-    if address:
-        return bool(re.match(r"^\d+", address.strip()))
-
-    return False
 
 def _fetch_tomtom_coordinates(
     sess: requests.Session,
