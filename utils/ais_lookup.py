@@ -163,6 +163,8 @@ def _fetch_ais_coordinates(
                 return None, None
             
         return None, None
+    
+    return None, None
 
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
