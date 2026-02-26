@@ -90,7 +90,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "ais",
+        "geocoder_used": "ais",
         "is_multiple_match": False,
     }
 
@@ -150,7 +150,7 @@ def test_ais_lookup_only_fetches_4326(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "ais",
+        "geocoder_used": "ais",
         "is_multiple_match": False,
     }
     # Ensure geocode_x and geocode_y are not in result
@@ -230,7 +230,7 @@ def test_ais_lookup_only_fetches_2272(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "match_type": "ais",
+        "geocoder_used": "ais",
         "is_multiple_match": False,
     }
     # Ensure geocode_lat and geocode_lon are not in result
@@ -327,7 +327,7 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 N MARKET ST",
-        "match_type": "ais",
+        "geocoder_used": "ais",
         "is_multiple_match": False,
     }
 
@@ -404,7 +404,7 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         "is_addr": False,
         "is_philly_addr": True,
         "output_address": "1234 mkt st",
-        "match_type": "ais",
+        "geocoder_used": "ais",
         "is_multiple_match": True,
     }
 
@@ -463,5 +463,5 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
         "is_philly_addr": False,
         "output_address": "123 fake st",
         "is_multiple_match": False,
-        "match_type": None,
+        "geocoder_used": None,
     }

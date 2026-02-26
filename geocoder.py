@@ -123,7 +123,7 @@ def parse_with_passyunk_parser(
             pl.Field("is_addr", pl.Boolean),
             pl.Field("is_philly_addr", pl.Boolean),
             pl.Field("is_multiple_match", pl.Boolean),
-            pl.Field("match_type", pl.String),
+            pl.Field("geocoder_used", pl.String),
         ]
     )
 
@@ -236,8 +236,8 @@ def add_address_file_fields(
     joined_lf = joined_lf.with_columns(
         pl.when(match_condition)
         .then(pl.lit("address_file"))
-        .otherwise("match_type")
-        .alias("match_type")
+        .otherwise("geocoder_used")
+        .alias("geocoder_used")
     )
 
     return joined_lf
@@ -310,7 +310,7 @@ def enrich_with_ais(
     pl.Field("is_addr", pl.Boolean),
     pl.Field("is_philly_addr", pl.Boolean),
     pl.Field("is_multiple_match", pl.Boolean),
-    pl.Field("match_type", pl.String),
+    pl.Field("geocoder_used", pl.String),
 ]
 
     if srid_4326:
@@ -424,7 +424,7 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
 
     struct_fields = [
         pl.Field("output_address", pl.String),
-        pl.Field("match_type", pl.String),
+        pl.Field("geocoder_used", pl.String),
         pl.Field("is_addr", pl.Boolean),
         pl.Field("is_philly_addr", pl.Boolean),
     ]
@@ -580,6 +580,42 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
 
+        # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
+        # Only do this for split address fields (street/city/state/zip)
+        # Don't do this for full_address fields, as Passyunk strips city/state
+        if "street" in address_fields.keys():
+            # Build list of available location components
+            location_components = []
+            for key in ["city", "state", "zip"]:
+                if key in address_fields.keys() and address_fields[key] is not None:
+                    location_components.append(
+                        pl.col(address_fields[key]).fill_null("")
+                    )
+
+            lf = lf.with_columns(
+                pl.when(pl.col("output_address").is_not_null())
+                .then(
+                    pl.concat_str(
+                        [pl.col("output_address")] + location_components,
+                        separator=" ",
+                    )
+                    .str.replace_all(r"\s+", " ")
+                    .str.strip_chars()
+                )
+                .otherwise(pl.col(passyunk_address_field))
+                .alias("joined_address"),
+
+                pl.concat_str(
+                [pl.col("raw_address")] + location_components,
+                separator=" ",
+                ).str.replace_all(r"\s+", " ")\
+                    .str.strip_chars()\
+                        .alias("raw_address"),  # overwrite raw_address in place
+            )
+        else:
+            # For full_address cases, use the original field as joined_address
+            lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
+
         # ---------------- Split out Non Philly Addresses -------------------#
         philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
 
@@ -622,7 +658,7 @@ def process_csv(config_path) -> pl.LazyFrame:
             pl.concat([has_geo, tomtom_enriched])
             .sort("__geocode_idx__")
             .drop(
-                ["__geocode_idx__", "is_non_philly", "is_undefined", "raw_address"]
+                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"]
             )
         )
 
@@ -639,12 +675,12 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         cols_without_geo = [c for c in final_cols if c not in geo_cols]
         
-        if "match_type" in cols_without_geo:
-            insert_idx = cols_without_geo.index("match_type") + 1
+        if "geocoder_used" in cols_without_geo:
+            insert_idx = cols_without_geo.index("geocoder_used") + 1
         else:
             insert_idx = 0
         
-        # Insert all geocode columns together after match_type
+        # Insert all geocode columns together after geocoder_used
         ordered_cols = (
             cols_without_geo[:insert_idx] + 
             geo_cols + 

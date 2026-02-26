@@ -163,8 +163,6 @@ def _fetch_ais_coordinates(
                 return None, None
             
         return None, None
-    
-    return None, None
 
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
@@ -255,7 +253,7 @@ def ais_lookup(
                 out_data["geocode_y"] = None
             
             out_data["is_multiple_match"] = True
-            out_data["match_type"] = "ais"
+            out_data["geocoder_used"] = "ais"
 
             for field in enrichment_fields:
                 out_data[field] = None
@@ -272,7 +270,7 @@ def ais_lookup(
             out_data["is_addr"] = True
             out_data["is_philly_addr"] = True
             out_data["is_multiple_match"] = False
-            out_data["match_type"] = "ais"
+            out_data["geocoder_used"] = "ais"
 
         # Fetch coordinates based on config
             if fetch_4326:
@@ -301,7 +299,7 @@ def ais_lookup(
     out_data["is_addr"] = existing_is_addr
     out_data["is_philly_addr"] = existing_is_philly_addr
     out_data["is_multiple_match"] = False
-    out_data["match_type"] = None
+    out_data["geocoder_used"] = None
 
     if fetch_4326:
         out_data["geocode_lat"] = None

@@ -261,5 +261,5 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
         "is_addr": is_addr,
         "is_philly_addr": is_philly_addr,
         "is_multiple_match": False,
-        "match_type": None,
+        "geocoder_used": None,
     }
