@@ -171,6 +171,11 @@ def find_address_fields(config_path) -> dict[str]:
 
     addr_fields = config.get("address_fields")
 
+    # street_address used to be called street, adding this for backward compatibility
+    # in case someone hasn't updated their config file to call it street_address
+    if addr_fields.get("street") and not addr_fields.get("street_address"):
+        addr_fields["street_address"] = addr_fields.pop("street")
+
     # If user has not specified an address field, raise
     if not full_addr and not any(addr_fields.values()):
         raise ValueError(
@@ -203,11 +208,11 @@ def find_address_fields(config_path) -> dict[str]:
                 print("Exiting program...")
                 sys.exit()
 
-    if not addr_fields.get("street"):
+    if not addr_fields.get("street_address"):
         raise ValueError(
             "When full address field is not specified, "
             "address_fields must include a non-null value for "
-            "street."
+            "street_address."
         )
 
     fields = addr_fields

@@ -10,7 +10,7 @@ full_address_field:
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
-  street:
+  street_address:
   city:
   state:
   zip:
