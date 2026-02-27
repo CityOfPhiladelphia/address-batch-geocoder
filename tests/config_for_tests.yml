@@ -1,0 +1,31 @@
+
+# Connection Credentials
+AIS_API_KEY:
+
+# Input File Config
+input_file: ./geocoder/sample_file_input.csv
+geography_file: ../geocoder_address_data/address_service_area_summary.parquet
+
+full_address_field:
+
+# OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
+address_fields:
+  street_address: street_address
+  city: address_city
+  state: address_state
+  zip: address_zip
+
+# Enrichment Fields -- Aside from coordinates, what fields to add
+enrichment_fields:
+  - census_tract_2020
+  - census_block_group_2020
+  - census_block_2020
+  - seg_id
+  - us_congressional_2022
+  # ADD MORE FIELDS BELOW, EG: 
+  # - census_tract_2010
+  # - seg_id
+
+# Which SRIDs to return for geocoding
+srid_4326: true
+srid_2272: true
