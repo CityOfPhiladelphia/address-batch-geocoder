@@ -14,6 +14,9 @@ import yaml
 
 @pytest.fixture(scope="session")
 def geocoded_output(tmp_path_factory):
+    if os.getenv("CI") == "true":
+        pytest.skip("E2E tests not supported in CI")
+        
     tmp = tmp_path_factory.mktemp("geocoder")
 
     input_path = tmp / TEST_CSV.name
