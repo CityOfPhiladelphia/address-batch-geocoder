@@ -569,7 +569,7 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         passyunk_address_field = address_fields.get(
             "full_address"
-        ) or address_fields.get("street")
+        ) or address_fields.get("street_address")
 
         parser = PassyunkParser()
         
@@ -583,7 +583,7 @@ def process_csv(config_path) -> pl.LazyFrame:
         # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
         # Only do this for split address fields (street/city/state/zip)
         # Don't do this for full_address fields, as Passyunk strips city/state
-        if "street" in address_fields.keys():
+        if "street_address" in address_fields.keys():
             # Build list of available location components
             location_components = []
             for key in ["city", "state", "zip"]:
