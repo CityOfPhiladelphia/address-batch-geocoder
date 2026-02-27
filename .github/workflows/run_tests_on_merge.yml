@@ -9,6 +9,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  AIS_API_KEY: ${{ secrets.AIS_API_KEY }}
     
 jobs:
   if_merged:

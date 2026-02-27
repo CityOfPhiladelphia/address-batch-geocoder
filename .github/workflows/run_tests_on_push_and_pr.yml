@@ -9,7 +9,10 @@ on:
       - reopened
     branches:
       - main
-    
+
+env:
+  AIS_API_KEY: ${{ secrets.AIS_API_KEY }}  
+
 jobs:
   test:
     runs-on: ubuntu-latest
