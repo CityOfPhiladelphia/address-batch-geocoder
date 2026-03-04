@@ -15,58 +15,41 @@ p = PassyunkParser()
 parse = partial(parse_address, p)
 zips = ZIPS
 
+def test_falls_back_to_component_fields():
+    config = {
+        "full_address_field": None,
+        "address_fields": {"street_address": "addr_st", "city": "addr_city"},
+    }
 
-def write_yaml(tmp_path, data, name="config.yml"):
-    p = tmp_path / name
-    p.write_text(yaml.safe_dump(data, sort_keys=False))
-    return str(p)
-
-
-def test_falls_back_to_component_fields(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path,
-        {
-            "full_address_field": None,
-            "address_fields": {"street_address": "addr_st", "city": "addr_city"},
-        },
-    )
-
-    assert find_address_fields(cfg_path) == {"street_address": "addr_st", "city": "addr_city"}
+    assert find_address_fields(config) == {"street_address": "addr_st", "city": "addr_city"}
 
 
-def test_raises_if_street_missing(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path,
-        {
-            "full_address_field": None,
-            "address_fields": {"city": "addr_city", "zip": "addr_zip"},
-        },
-    )
+def test_raises_if_street_missing():
+    config = {
+        "full_address_field": None,
+        "address_fields": {"city": "addr_city", "zip": "addr_zip"},
+    }
+    
 
     with pytest.raises(ValueError, match="street_address"):
-        find_address_fields(cfg_path)
+        find_address_fields(config)
 
 
-def test_raises_if_street_null(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path,
-        {
-            "full_address_field": None,
-            "address_fields": {"street_address": None, "city": "addr_city"},
-        },
-    )
+def test_raises_if_street_null():
+    config = {
+        "full_address_field": None,
+        "address_fields": {"street_address": None, "city": "addr_city"},
+    }
 
     with pytest.raises(ValueError, match="is not specified"):
-        find_address_fields(cfg_path)
+        find_address_fields(config)
 
 
-def test_raises_when_both_null(tmp_path):
-    cfg_path = write_yaml(
-        tmp_path, {"full_address_field": None, "address_fields": {"street_address": None}}
-    )
+def test_raises_when_both_null():
+    config = {"full_address_field": None, "address_fields": {"street_address": None}}
 
     with pytest.raises(ValueError, match="specified in the config file"):
-        find_address_fields(cfg_path)
+        find_address_fields(config)
 
 
 def test_parse_real_address():
