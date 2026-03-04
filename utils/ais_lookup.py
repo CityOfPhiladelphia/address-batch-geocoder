@@ -247,6 +247,8 @@ def ais_lookup(
             out_data["output_address"] = normalized_addr if normalized_addr else address
             out_data["is_addr"] = False
             out_data["is_philly_addr"] = True
+            out_data["is_multiple_match"] = True
+            out_data["geocoder_used"] = "ais"
 
             if fetch_4326:
                 out_data["geocode_lat"] = None
@@ -255,9 +257,6 @@ def ais_lookup(
             if fetch_2272:
                 out_data["geocode_x"] = None
                 out_data["geocode_y"] = None
-            
-            out_data["is_multiple_match"] = True
-            out_data["geocoder_used"] = "ais"
 
             for field in enrichment_fields:
                 out_data[field] = None
