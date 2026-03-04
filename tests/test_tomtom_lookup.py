@@ -68,12 +68,12 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
 
     def fake_get(self, url, params=None, timeout=None, **kwargs):
         call_count["count"] += 1
-        # First call - SRID 4326
         if call_count["count"] == 1:
-            return FakeResponse(json_response_match, 200)
-        # Second call - SRID 2272
+            return FakeResponse(json_response_match, 200)       # initial lookup
+        elif call_count["count"] == 2:
+            return FakeResponse(json_response_match_2272, 200)  # _fetch_tomtom_coordinates 2272
         else:
-            return FakeResponse(json_response_match_2272, 200)
+            raise AssertionError(f"Unexpected call #{call_count['count']}")
 
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
@@ -93,7 +93,6 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
         "output_address": "1234 MARKET ST",
         "geocoder_used": "tomtom",
     }
-
 
 def test_tomtom_lookup_only_fetches_4326(monkeypatch):
     class FakeResponse:
@@ -249,6 +248,7 @@ def test_tomtom_lookup_handles_non_philly_address(monkeypatch):
                     }
                 ],
             }, 200)
+            
         else:
             return FakeResponse({
                 "spatialReference": {"wkid": 2272, "latestWkid": 2272},

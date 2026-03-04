@@ -14,7 +14,6 @@ import yaml
 
 @pytest.fixture(scope="session")
 def geocoded_output(tmp_path_factory):
-
     tmp = tmp_path_factory.mktemp("geocoder")
 
     input_path = tmp / TEST_CSV.name
@@ -76,6 +75,24 @@ def test_address_file_match(geocoded_output):
         row = geocoded_output.filter(pl.col("street_address") == address)
         
         assert row["geocoder_used"].item() == "address_file"
+
+def test_tomtom_address_has_right_coordinates(geocoded_output):
+    city = "Lawnside"
+    row = geocoded_output.filter(pl.col("address_city") == city)
+
+    assert row["geocode_lat"].item() == 39.8755899
+    assert row["geocode_lon"].item() == -75.03612616
+    assert row["geocode_x"].item() == 2730093.07070462
+    assert row["geocode_y"].item() == 209237.2950039
+
+def test_api_address_has_right_coordinates(geocoded_output):
+    address = "1100 W Godfrey Ave Bldg A ent @ 1100 W. Godfrey Ave"
+    row = geocoded_output.filter(pl.col("street_address") == address)
+
+    assert row["geocode_lat"].item() == 40.04610199
+    assert row["geocode_lon"].item() == -75.13838509
+    assert row["geocode_x"].item() == 2699567.12316782
+    assert row["geocode_y"].item() == 270461.85786862
 
 @pytest.mark.skipif(
     os.getenv("AIS_API_KEY") is None, 
