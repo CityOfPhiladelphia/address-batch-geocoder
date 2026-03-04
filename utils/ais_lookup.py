@@ -279,6 +279,8 @@ def ais_lookup(
         # Fetch coordinates based on config
             if fetch_4326:
                 try:
+                    # Don't need to make another lookup, we already have
+                    # coords from first lookup
                     lon, lat = tiebroken_address["geometry"]["coordinates"]
                 except (KeyError, TypeError, ValueError):
                     lon, lat = None, None

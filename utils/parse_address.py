@@ -4,18 +4,14 @@ import usaddress
 import sys
 
 
-def infer_city_state_field(config_path) -> dict:
+def infer_city_state_field(config) -> dict:
     """
     Args:
-        config_path (str): The path of the config file.
+        config: The config object
 
     Returns dict: A dict mapping city and state fields to
     the field names in the user's input file
     """
-
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
     full_addr = config.get("full_address_field")
 
     if full_addr:
@@ -148,21 +144,18 @@ def is_non_philly_from_split_address(
     return flag_non_philly_address(address_data, zips)
 
 
-def find_address_fields(config_path) -> dict[str]:
+def find_address_fields(config) -> dict[str]:
     """
     Parses which address fields to consider in the input file based on
     the content of config.yml. Raises an error if neither full_address_field
     nor street are specified in the config file.
 
     Args:
-        config_path (str): The path of the config file.
+        config (dict): A config object
 
     Returns dict: A dict of address field names in the input file.
 
     """
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
     # There are two possible ways to input address in the yaml config
     # 1. Specifying a full address string (if address is stored in one column)
     # 2. Specifying a list of address fields (address, city, state, zip) for

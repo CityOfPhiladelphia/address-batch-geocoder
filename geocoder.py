@@ -33,7 +33,7 @@ def get_current_time():
     return current_datetime.strftime("%H:%M:%S")
 
 
-def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
+def split_non_philly_address(config, lf: pl.LazyFrame) -> pl.LazyFrame:
     """
     Given a polars LazyFrame, splits into two lazy frames:
     One for addresses located in Philadelphia, one for addresses
@@ -43,7 +43,7 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
         (philly_lf, non_philly_lf)
     """
 
-    fields = infer_city_state_field(config_path)
+    fields = infer_city_state_field(config)
 
     # If we are using full address field, we need to look up
     # against us-address.
@@ -519,7 +519,7 @@ def process_csv(config_path):
         )
 
     # Determine which fields in the file are the address fields
-    address_fields = find_address_fields(config_path)
+    address_fields = find_address_fields(config)
 
     # Detect input file encoding
     encoding = detect_file_encoding(filepath)
@@ -613,7 +613,7 @@ def process_csv(config_path):
             lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
 
         # ---------------- Split out Non Philly Addresses -------------------#
-        philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+        philly_lf, non_philly_lf = split_non_philly_address(config, lf)
 
         # Generate the names of columns to add for both the AIS API
         # and the address file
