@@ -2,6 +2,7 @@ import requests
 from .rate_limiter import RateLimiter
 from retrying import retry
 from .parse_address import tag_full_address, flag_non_philly_address
+from .ais_lookup import _round_coordinates
 
 TOMTOM_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
 
@@ -83,16 +84,17 @@ def _do_tomtom_lookup(
             try:
                 lon = r_json["location"]["x"]
                 lat = r_json["location"]["y"]
-                out_data["geocode_lat"] = str(round(float(lat), 8))
-                out_data["geocode_lon"] = str(round(float(lon), 8))
+                out_data["geocode_lon"] = _round_coordinates(lon)
+                out_data["geocode_lat"] = _round_coordinates(lat)
+
             except KeyError:
                 out_data["geocode_lat"] = None
-                out_data["geocode_lon"] = None
+                out_data["geocode_lon"] = None            
 
         if fetch_2272:
             geo_x, geo_y = _fetch_tomtom_coordinates(sess, matched_address, 2272)
-            out_data["geocode_x"] = str(round(float(geo_x), 8))
-            out_data["geocode_y"] = str(round(float(geo_y), 8))
+            out_data["geocode_x"] = _round_coordinates(geo_x)
+            out_data["geocode_y"] = _round_coordinates(geo_y)
 
         return out_data
 

@@ -9,18 +9,17 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  AIS_API_KEY: ${{ secrets.AIS_API_KEY }}
     
 jobs:
   if_merged:
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Get code
         uses: actions/checkout@v5
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: ".python-version"
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:

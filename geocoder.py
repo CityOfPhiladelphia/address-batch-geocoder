@@ -2,7 +2,7 @@ import os
 
 # Set thread pool size to 1 to avoid API rate limits
 # This needs to be set before polars is imported
-os.environ["POLARS_MAX_THREADS"] = "1"
+# os.environ["POLARS_MAX_THREADS"] = "1"
 
 import yaml
 import polars as pl
@@ -295,7 +295,7 @@ def enrich_with_ais(
 
     # Created augmented address for undefined locations
     to_add = to_add.with_columns(
-        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        pl.when(pl.col("is_undefined"))
         .then(pl.concat_str([pl.col("output_address"), pl.lit(", Philadelphia, PA")]))
         .otherwise(pl.col("output_address"))
         .alias("api_address")
@@ -413,7 +413,7 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
     # Create augmented address for undefined locations
     
     to_add = to_add.with_columns(
-        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        pl.when(pl.col("is_undefined"))
         .then(pl.concat_str([pl.col("raw_address"), pl.lit(", Philadelphia, PA")]))
         .otherwise(pl.col("raw_address"))
         .alias("raw_api_address")
@@ -445,34 +445,33 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
     field_names = [f.name for f in new_cols.fields]
 
     with requests.Session() as sess:
-        with pl.Config(set_streaming_chunk_size=1):
-            added = (
-                # Use the joined raw (not parsed with passyunk) address for tomtom, as passyunk parser 
-                # may sometimes strip out key information
-                to_add.with_columns(
-                    pl.struct(["raw_api_address", "output_address"])
-                    .map_elements(
-                        lambda cols: tomtom_lookup(
-                            sess,
-                            parser,
-                            ZIPS,
-                            cols["raw_api_address"],
-                            cols["output_address"],
-                            srid_4326,
-                            srid_2272,
-                        ),
-                        return_dtype=new_cols,
-                    )
-                    .alias("tomtom_struct")
+        added = (
+            # Use the joined raw (not parsed with passyunk) address for tomtom, as passyunk parser 
+            # may sometimes strip out key information
+            to_add.with_columns(
+                pl.struct(["raw_api_address", "output_address"])
+                .map_elements(
+                    lambda cols: tomtom_lookup(
+                        sess,
+                        parser,
+                        ZIPS,
+                        cols["raw_api_address"],
+                        cols["output_address"],
+                        srid_4326,
+                        srid_2272,
+                    ),
+                    return_dtype=new_cols,
                 )
-                .with_columns(
-                    *[
-                        pl.col("tomtom_struct").struct.field(n).alias(n)
-                        for n in field_names
-                    ]
-                )
-                .drop("tomtom_struct", "raw_api_address")
+                .alias("tomtom_struct")
             )
+            .with_columns(
+                *[
+                    pl.col("tomtom_struct").struct.field(n).alias(n)
+                    for n in field_names
+                ]
+            )
+            .drop("tomtom_struct", "raw_api_address")
+        )
 
     return added
 
@@ -485,16 +484,13 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
     show_default="./config.yml",
     help="The path to the config file.",
 )
-def process_csv(config_path) -> pl.LazyFrame:
+def process_csv(config_path):
     """
     Given a config file with the csv filepath, normalizes records
     in that file using Passyunk.
 
     Args:
         config_path (str): The path to the config file
-        chunksize (int): Batch size for file reading
-
-    Returns: A polars lazy dataframe
     """
     current_time = get_current_time()
     print(f"Beginning enrichment process at {current_time}.")

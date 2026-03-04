@@ -74,10 +74,10 @@ def make_coordinate_lookups(
     """Given a list of coordinate pairs, do a reverse lookup
     against the AIS API. Returns a list of matches for each
     coordinate pair in the list."""
-    AIS_RATE_LIMITER.wait()
     out_data = []
 
     for coord in coords:
+        AIS_RATE_LIMITER.wait()
         lon, lat = coord
         ais_url = f"https://api.phila.gov/ais_doc/v1/reverse_geocode/{lon},{lat}"
         params = {}
@@ -122,6 +122,13 @@ def tiebreak_coordinate_lookups(responses: list[dict], zip: str):
     # are actually the same
     if addresses:
         return addresses[0]
+
+def _round_coordinates(coord) -> str:
+    """Round and stringify a coordinate value, returning None if invalid."""
+    try:
+        return str(round(float(coord), 8))
+    except (TypeError, ValueError):
+        return None
 
 def _fetch_ais_coordinates(
         sess: requests.Session,
@@ -177,7 +184,7 @@ def ais_lookup(
     api_key: str,
     address: str,
     zip: str = None,
-    enrichment_fields: list = [],
+    enrichment_fields: list = None,
     existing_is_addr: bool = False,
     existing_is_philly_addr: bool = False,
     original_address: str = None,
@@ -203,10 +210,7 @@ def ais_lookup(
     """
     AIS_RATE_LIMITER.wait()
     ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=4326&max_range=0" 
-    params = {}
-    params["gatekeeperKey"] = api_key
-
-    response = sess.get(ais_url, params=params, verify=False)
+    response = sess.get(ais_url, verify=False)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
@@ -276,16 +280,15 @@ def ais_lookup(
             if fetch_4326:
                 try:
                     lon, lat = tiebroken_address["geometry"]["coordinates"]
-                    out_data["geocode_lat"] = str(round(float(lat), 8))
-                    out_data["geocode_lon"] = str(round(float(lon), 8))
-                except KeyError:
-                    out_data["geocode_lat"] = None
-                    out_data["geocode_lon"] = None
+                except (KeyError, TypeError, ValueError):
+                    lon, lat = None, None
+                out_data["geocode_lat"] = _round_coordinates(lat)
+                out_data["geocode_lon"] = _round_coordinates(lon)
 
             if fetch_2272:
                 geo_x, geo_y = _fetch_ais_coordinates(sess, api_key, out_address, zip, 2272)
-                out_data["geocode_x"] = str(round(float(geo_x), 8))
-                out_data["geocode_y"] = str(round(float(geo_y), 8))
+                out_data["geocode_x"] = _round_coordinates(geo_x)
+                out_data["geocode_y"] = _round_coordinates(geo_y)
 
             for field in enrichment_fields:
                 field_value = tiebroken_address.get("properties", "").get(field, "")
