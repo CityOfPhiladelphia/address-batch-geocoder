@@ -17,6 +17,7 @@ dependencies = [
     "retrying>=1.4.2",
     "ruff>=0.14.9",
     "setuptools>=80.9.0",
+    "streamlit>=1.50.0",
     "usaddress>=0.5.16",
     "wheel>=0.46.2",
 ]

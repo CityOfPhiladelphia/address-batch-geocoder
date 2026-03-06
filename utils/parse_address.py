@@ -162,7 +162,7 @@ def find_address_fields(config) -> dict[str]:
     # if address is stored in multiple columns.
     full_addr = config.get("full_address_field")
 
-    addr_fields = config.get("address_fields")
+    addr_fields = config.get("address_fields") or {}
 
     # street_address used to be called street, adding this for backward compatibility
     # in case someone hasn't updated their config file to call it street_address
@@ -201,14 +201,18 @@ def find_address_fields(config) -> dict[str]:
                 print("Exiting program...")
                 sys.exit()
 
-    if not addr_fields.get("street_address"):
+    if full_addr:
+        if not addr_fields or not any(addr_fields.values()):
+            return {"full_address": full_addr}
+    
+    if not full_addr and not addr_fields.get("street_address"):
         raise ValueError(
             "When full address field is not specified, "
             "address_fields must include a non-null value for "
             "street_address."
         )
 
-    fields = addr_fields
+    fields = {k: v for k, v in addr_fields.items() if v is not None}
     return fields
 
 
