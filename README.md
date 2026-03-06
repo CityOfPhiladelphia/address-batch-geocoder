@@ -349,3 +349,7 @@ flowchart TB
     style M fill:#FFE0B2
     style N fill:#FFF9C4
 ```
+
+## TODO:
+- A configuration save option
+- Potentially implementing queuing
