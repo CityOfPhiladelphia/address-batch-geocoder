@@ -3,7 +3,7 @@ name = "address-geocoder"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "black>=25.9.0",
     "chardet>=5.2.0",

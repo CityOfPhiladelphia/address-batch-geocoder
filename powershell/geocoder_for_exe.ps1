@@ -108,21 +108,21 @@ function installGit {
 }
 
 function installPython {
-    Write-Host "Checking for Python 3.10 on this machine..."
+    Write-Host "Checking for Python 3.11 on this machine..."
 
-    & py -3.10 --version > $null 2>&1
+    & py -3.11 --version > $null 2>&1
     if ($LASTEXITCODE -eq 0) {
-        $ver = py -3.10 --version
-        Write-Host "Python 3.10 is already available: $ver"
+        $ver = py -3.11 --version
+        Write-Host "Python 3.11 is already available: $ver"
         return
     }
 
-    Write-Host "Python 3.10 not found. Attempting installation via winget (source 'winget')..."
+    Write-Host "Python 3.11 not found. Attempting installation via winget (source 'winget')..."
 
     $wingetArgs = @(
         "install",
         "-e",
-        "--id","Python.Python.3.10",
+        "--id","Python.Python.3.11",
         "--source","winget",
         "--accept-source-agreements",
         "--accept-package-agreements"
@@ -130,8 +130,8 @@ function installPython {
 
     & winget @wingetArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget failed to install Python 3.10 (exit code $LASTEXITCODE)." -ForegroundColor Red
-        Write-Host "You may need to install Python 3.10 manually from python.org, then re-run this script." -ForegroundColor Yellow
+        Write-Host "winget failed to install Python 3.11 (exit code $LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "You may need to install Python 3.11 manually from python.org, then re-run this script." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         exit 1
     }
@@ -139,16 +139,16 @@ function installPython {
     # Refresh path after Python install
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
-    & py -3.10 --version > $null 2>&1
+    & py -3.11 --version > $null 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget reported success, but 'py -3.10' is still not available." -ForegroundColor Red
-        Write-Host "Please install Python 3.10 manually, ensure 'py -3.10' works, then re-run this script." -ForegroundColor Yellow
+        Write-Host "winget reported success, but 'py -3.11' is still not available." -ForegroundColor Red
+        Write-Host "Please install Python 3.11 manually, ensure 'py -3.11' works, then re-run this script." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         exit 1
     }
 
-    $ver2 = py -3.10 --version
-    Write-Host "Python 3.10 installation complete: $ver2"
+    $ver2 = py -3.11 --version
+    Write-Host "Python 3.11 installation complete: $ver2"
 }
 
 function installUv {
@@ -188,7 +188,7 @@ function createVenvAndConfig {
     if (-not (Test-Path $venvPath)) {
         Write-Host "Creating virtual environment..."
         try {
-        $output = & uv venv $venvPath --python 3.10 2>&1
+        $output = & uv venv $venvPath --python 3.11 2>&1
         }
 
         catch {
@@ -231,7 +231,7 @@ function cloneOrUpdate {
             $null = git fetch origin 2>&1
             
             $localCommit = git rev-parse HEAD
-            $remoteCommit = git rev-parse "origin/main"
+            $remoteCommit = git rev-parse "origin/frontend-test"
             
             if ($localCommit -ne $remoteCommit) {
                 Write-Host "Updates available. Pulling changes..."
@@ -245,7 +245,7 @@ function cloneOrUpdate {
                     $stashed = $false
                 }
                 
-                $null = git pull origin "main" 2>&1
+                $null = git pull origin "frontend-test" 2>&1
                 
                 # Restore stashed changes if we stashed them
                 if ($stashed) {
@@ -445,9 +445,38 @@ if ($script:RepoWasJustCloned) {
 }
 
 # Always run the geocoder if not first-time setup
-Write-Host "`nRunning geocoder..." -ForegroundColor Green
+[string]$runOption = Read-Host -Prompt "Choose an option:`n[1] Run with the user-interface`n[2] Run with the .yml config`n[Any other key]: exit"
 
-try {
+switch ($runOption) {
+    '1' {
+       try {
+
+    $appPy = Join-Path $installFolder 'app.py'  # adjust to your actual entrypoint
+    $process = Start-Process -FilePath $venvPython `
+                            -ArgumentList "-m", "streamlit", "run", $appPy `
+                            -WorkingDirectory $ScriptDirectory `
+                            -NoNewWindow `
+                            -Wait `
+                            -PassThru
+
+    if ($process.ExitCode -ne 0) {
+        throw "Streamlit exited with code $($process.ExitCode)"
+    }
+}
+catch {
+    Write-Host "`n========== ERROR ==========" -ForegroundColor Red
+    Write-Host "An error occurred while running the geocoder:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Yellow
+    Write-Host "============================" -ForegroundColor Red
+}
+finally {
+    Write-Host "`nProcess complete. Press any key to close..."
+    [void][System.Console]::ReadKey($true)
+} 
+    }
+
+    '2' {
+        try {
     # Use Start-Process to allow interactive prompts
     $process = Start-Process -FilePath $venvPython `
                              -ArgumentList $geocoderPy `
@@ -469,4 +498,6 @@ catch {
 finally {
     Write-Host "`nProcess complete. Press any key to close..."
     [void][System.Console]::ReadKey($true)
+}
+    }
 }
