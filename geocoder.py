@@ -148,24 +148,25 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     Returns: A tuple with AIS fieldnames and address file fieldnames.
     """
     ais_enrichment_fields = config["enrichment_fields"]
-
-    invalid_fields = [
-        item for item in ais_enrichment_fields if item not in POSSIBLE_FIELDS.keys()
-    ]
-
-    if invalid_fields:
-        to_print = ", ".join(field for field in invalid_fields)
-        raise ValueError(
-            "The following fields are not available:"
-            f"{to_print}. Please correct these and try again."
-        )
-
     address_file_fields = []
 
-    [
-        address_file_fields.append(POSSIBLE_FIELDS[item])
-        for item in ais_enrichment_fields
-    ]
+    # Only append enrichment fields if set to avoid NoneType Error
+    if ais_enrichment_fields:
+        invalid_fields = [
+            item for item in ais_enrichment_fields if item not in POSSIBLE_FIELDS.keys()
+        ]
+
+        if invalid_fields:
+            to_print = ", ".join(field for field in invalid_fields)
+            raise ValueError(
+                "The following fields are not available:"
+                f"{to_print}. Please correct these and try again."
+            )
+
+        [
+            address_file_fields.append(POSSIBLE_FIELDS[item])
+            for item in ais_enrichment_fields
+        ]
 
     # Need street_address for joining
     address_file_fields.append("street_address")
@@ -180,7 +181,8 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
         address_file_fields.extend(["geocode_x", "geocode_y"])
 
     # Avoid issues if user specifies a field more than once
-    return (set(ais_enrichment_fields), set(address_file_fields))
+    # Return empty set if no enrichment fields set
+    return (set(ais_enrichment_fields) if ais_enrichment_fields else set(), set(address_file_fields))
 
 
 def add_address_file_fields(
