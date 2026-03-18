@@ -209,6 +209,30 @@ def ais_lookup(
         and user-requested fields.
     """
     AIS_RATE_LIMITER.wait()
+
+    # Don't attempt to geocode if address is null
+    if not address:
+        out_data = {
+            'output_address': original_address if original_address else address,
+            'is_addr': existing_is_addr,
+            'is_philly_addr': existing_is_philly_addr,
+            'is_multiple_match': False,
+            'geocoder_used': None,
+        }
+
+        if fetch_4326:
+            out_data["geocode_lat"] = None
+            out_data["geocode_lon"] = None
+        
+        if fetch_2272:
+            out_data["geocode_x"] = None
+            out_data["geocode_y"] = None
+        
+        for field in enrichment_fields:
+            out_data[field] = None
+        
+        return out_data
+
     ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=4326&max_range=0" 
     response = sess.get(ais_url, verify=False)
 

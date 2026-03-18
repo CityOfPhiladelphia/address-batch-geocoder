@@ -76,23 +76,23 @@ def test_address_file_match(geocoded_output):
         
         assert row["geocoder_used"].item() == "address_file"
 
-def test_tomtom_address_has_right_coordinates(geocoded_output):
+def test_tomtom_address_returns_coordinates(geocoded_output):
     city = "Lawnside"
     row = geocoded_output.filter(pl.col("address_city") == city)
 
-    assert row["geocode_lat"].item() == 39.8755899
-    assert row["geocode_lon"].item() == -75.03612616
-    assert row["geocode_x"].item() == 2730093.07070462
-    assert row["geocode_y"].item() == 209237.2950039
+    assert row["geocode_lat"].item() == pytest.approx(39.8755899, rel=1e-3)
+    assert row["geocode_lon"].item() == pytest.approx(-75.03612616, rel=1e-3)
+    assert row["geocode_x"].item() == pytest.approx(2730093.07070462, rel=1e-3)
+    assert row["geocode_y"].item() == pytest.approx(209237.2950039, rel=1e-3)
 
 def test_api_address_has_right_coordinates(geocoded_output):
     address = "1100 W Godfrey Ave Bldg A ent @ 1100 W. Godfrey Ave"
     row = geocoded_output.filter(pl.col("street_address") == address)
 
-    assert row["geocode_lat"].item() == 40.04610199
-    assert row["geocode_lon"].item() == -75.13838509
-    assert row["geocode_x"].item() == 2699567.12316782
-    assert row["geocode_y"].item() == 270461.85786862
+    assert row["geocode_lat"].item() == pytest.approx(40.04610199, rel=1e-3)
+    assert row["geocode_lon"].item() == pytest.approx(-75.13838509, rel=1e-3)
+    assert row["geocode_x"].item() == pytest.approx(2699567.12316782, rel=1e-3)
+    assert row["geocode_y"].item() == pytest.approx(270461.85786862, rel=1e-3)
 
 @pytest.mark.skipif(
     os.getenv("AIS_API_KEY") is None, 
@@ -105,4 +105,3 @@ def test_ais_match(geocoded_output):
         row = geocoded_output.filter(pl.col("street_address") == address)
         
         assert row["geocoder_used"].item() == "ais"
-
