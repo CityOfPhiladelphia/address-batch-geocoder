@@ -8,7 +8,7 @@ from geocoder import process_data
 
 
 AIS_API_KEY = os.environ.get("AIS_API_KEY")
-GEOGRAPHY_FILE = './geocoder_address_data/address_service_area_summary.parquet'
+ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
 
 # UI Configurations
 st.set_page_config(page_title="Address Batch Geocoder", 
@@ -244,7 +244,7 @@ def main():
     config = {
         "AIS_API_KEY": api_key,
         "input_file": uploaded_file.name if uploaded_file else None,
-        "geography_file": GEOGRAPHY_FILE,
+        "ADDRESS_FILE": ADDRESS_FILE,
         "full_address_field": full_address_field,
         "address_fields": address_fields or "",
         "enrichment_fields": enrichment_fields,

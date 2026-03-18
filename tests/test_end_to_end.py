@@ -23,7 +23,7 @@ def geocoded_output(tmp_path_factory):
         config = yaml.safe_load(f)
     
     config["input_file"] = str(input_path)
-    config["geography_file"] = str(TEST_DIR / "test_address_file.parquet")
+    config["address_file"] = str(TEST_DIR / "test_address_file.parquet")
 
     if os.getenv("AIS_API_KEY"):
         config["AIS_API_KEY"] = os.getenv("AIS_API_KEY")
