@@ -194,7 +194,7 @@ def add_address_file_fields(
     left join on the full address.
 
     Args:
-        geo_filepath: The filepath to the geography file. This is the main
+        geo_filepath: The filepath to the address_file. This is the main
         file used to geocode addresses.
         input_data: A lazyframe containing the input data to be enriched
         address_fields: A list of one or more address fields
@@ -503,7 +503,7 @@ def process_data(filepath, config):
 
     if not geo_filepath:
         raise ValueError(
-            "A filepath for the geography file must be specified in the config."
+            "A filepath for the address_file must be specified in the config."
         )
 
     # Determine which fields in the file are the address fields
