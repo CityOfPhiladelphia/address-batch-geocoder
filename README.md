@@ -71,8 +71,6 @@ Choose an option:
 
 Press `1` to use the user interface. A window will open up in your default browser.
 
-![image-20260318114508641](C:\Users\caitlin.pratt\AppData\Roaming\Typora\typora-user-images\image-20260318114508641.png)
-
 The user interface has the following fields.
 
 1. The AIS API key. Required. Enter the AIS API key provided to you by CityGeo.
@@ -392,7 +390,6 @@ git push origin v1.0.0
 Publishing a new release will trigger the `build-and-publish` workflow, which calls the following command to create an executable file from the powershell script: `Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false`
 
 ## 5. Matching Process
-
 ```mermaid
 flowchart TB
     A["Input Address"] --> B@{ label: "Is it a Philadelphia address? If unknown, assume it's Philadelphia." }
@@ -437,5 +434,4 @@ flowchart TB
     style K fill:#FFE0B2
     style M fill:#FFE0B2
     style N fill:#FFF9C4
-
 ```
