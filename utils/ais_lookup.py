@@ -211,41 +211,27 @@ def ais_lookup(
     AIS_RATE_LIMITER.wait()
 
     # Don't attempt to geocode if address is null
-    if not address:
-        out_data = {
-            'output_address': original_address if original_address else address,
-            'is_addr': existing_is_addr,
-            'is_philly_addr': existing_is_philly_addr,
-            'is_multiple_match': False,
-            'geocoder_used': None,
-        }
+    if address:
+        try:
+            quoted_address = quote(address)
+            ais_url = "https://api.phila.gov/ais/v1/search/" + quoted_address + f"?gatekeeperKey={api_key}&srid=4326&max_range=0"
+            response = sess.get(ais_url, verify=False)
+        except:
+            print(f'ERROR: This address cannot be quoted: {address}, {zip}, {original_address}')
+            response = None
+    else:
+        response = None
 
-        if fetch_4326:
-            out_data["geocode_lat"] = None
-            out_data["geocode_lon"] = None
-        
-        if fetch_2272:
-            out_data["geocode_x"] = None
-            out_data["geocode_y"] = None
-        
-        for field in enrichment_fields:
-            out_data[field] = None
-        
-        return out_data
-
-    ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=4326&max_range=0" 
-    response = sess.get(ais_url, verify=False)
-
-    if response.status_code >= 500:
+    if response and response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
-    elif response.status_code == 429:
+    elif response and response.status_code == 429:
         print(response.text)
         raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
     # If status code is 200, that means API has found a match.
     # API will return a 404 if no match
-    if response.status_code == 200:
+    if response and response.status_code == 200:
         # If r_json is longer than 1, multiple matches
         # were returned and we need to tiebreak
         r_json = response.json()
