@@ -465,3 +465,61 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
         "is_multiple_match": False,
         "geocoder_used": None,
     }
+
+def test_ais_lookup_handles_blank_address(monkeypatch):
+    class FakeResponse:
+        def __init__(self, data, status_code=404):
+            self._data = data
+            self.status_code = status_code
+
+        def __getitem__(self, k):
+            return self._data[k]
+
+        def __bool__(self):
+            return True
+
+        def json(self):
+            return self._data
+
+    class FakeSession:
+        def get(self, *a, **k):
+            raise AssertionError("Should be patched")
+
+    def fake_get(self, url, params=None, timeout=None, **kwargs):
+        return FakeResponse(
+            {
+                "search_type": "address",
+                "features": [{"properties": {"street_address": "123 fake st"}}],
+            },
+            404,
+        )
+    
+
+    monkeypatch.setattr(FakeSession, "get", fake_get)
+    sess = FakeSession()
+
+    address = ""
+    result = ais_lookup.ais_lookup(
+        sess,
+        "1234",
+        address,
+        zip="19107",
+        enrichment_fields=[],
+        existing_is_addr=False,
+        existing_is_philly_addr=False,
+        original_address=address,
+        fetch_4326=True,
+        fetch_2272=True,
+    )
+
+    assert result == {
+        "geocode_lat": None,
+        "geocode_lon": None,
+        "geocode_x": None,
+        "geocode_y": None,
+        "is_addr": False,
+        "is_philly_addr": False,
+        "output_address": "",
+        "is_multiple_match": False,
+        "geocoder_used": None,
+    }
