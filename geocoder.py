@@ -531,7 +531,7 @@ def process_csv(config_path):
 
     # If encoding is not UTF-8, recode it
     utf8_filepath = ""
-    if encoding != "UTF-8":
+    if encoding.lower() != "utf-8":
         print(f"Converting file encoding from {encoding} to UTF-8")
 
         with tempfile.NamedTemporaryFile(
