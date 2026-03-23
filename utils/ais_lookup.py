@@ -28,10 +28,15 @@ def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
     """
 
     candidates = []
+
+    # Match only on first five of zip
+    input_zip = zip[:5] if zip else ""
     for candidate in features:
+
         # If the AIS API zip code matches the zip code on the
         # incoming data, this record is a potential match
-        if candidate["properties"].get("zip_code", "") == zip:
+        candidate_zip = candidate.get("properties", {}).get("zip_code", "")
+        if candidate_zip == input_zip or not zip:
             candidates.append(candidate)
 
     # Sometimes AIS returns two addresses for the same lat lon
@@ -94,7 +99,6 @@ def make_coordinate_lookups(
         if response.status_code >= 500:
             raise Exception("5xx response. There may be a problem with the AIS API.")
         elif response.status_code == 429:
-            print(response.text)
             raise Exception("429 response. Too many calls to the AIS API.")
 
         elif response.status_code == 401:
@@ -107,7 +111,7 @@ def make_coordinate_lookups(
             raise ValueError(
                 f"Error occurred with the following status code: {response.status_code}"
             )
-
+         
     return out_data
 
 def _round_coordinates(coord) -> str:
@@ -158,14 +162,6 @@ def _fetch_ais_coordinates(
             
         return None, None
 
-# Code adapted from Alex Waldman and Roland MacDavid
-# https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
-@retry(
-    wait_exponential_multiplier=1000,
-    wait_exponential_max=10000,
-    stop_max_attempt_number=3,
-    wait_fixed=200,
-)
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
 @retry(
@@ -234,7 +230,6 @@ def ais_lookup(
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
     elif response.status_code == 429:
-        print(response.text)
         raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
@@ -255,7 +250,9 @@ def ais_lookup(
             try:
                 coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
                 # tiebreak in a non-strict manner for coord lookups
-                tiebroken_address = tiebreak(coord_lookup_results, zip)
+                tiebroken_address = tiebreak([
+                    feature for r in coord_lookup_results for feature in r.get("features", [])
+                ], zip)
             
             except:
                 print(f'ERROR: This address cannot be tiebroken: {address}, {zip}, {coord_pairs}')
