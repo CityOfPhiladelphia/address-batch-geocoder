@@ -239,23 +239,31 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     and a boolean value indicating if the address is a valid Philadelphia
     address.
     """
-    prsd = parser.parse(address)
-    parsed = prsd["components"]
 
-    has_street_code = False
-    for street in ("street", "street_2"):
-        sc = parsed.get(street, {}).get("street_code")
-        if sc:
-            has_street_code = True
-            break
+    try:
+        prsd = parser.parse(address)
+        parsed = prsd["components"]
+    
+        has_street_code = False
+        for street in ("street", "street_2"):
+            sc = parsed.get(street, {}).get("street_code")
+            if sc:
+                has_street_code = True
+                break
 
-    # If address matches to a street code, it is a philly address
-    is_addr = bool(has_street_code)
-    is_philly_addr = bool(has_street_code)
+        # If address matches to a street code, it is a philly address
+        is_addr = bool(has_street_code)
+        is_philly_addr = bool(has_street_code)
 
-    output_address = (
-        parsed.get("output_address", address) if is_philly_addr else address
-    )
+        output_address = (
+            parsed.get("output_address", address) if is_philly_addr else address
+        )
+    
+    # Handle Passyunk parsing edge cases
+    except Exception as e:
+        output_address = address
+        is_addr = False
+        is_philly_addr = False
 
     return {
         "output_address": output_address,

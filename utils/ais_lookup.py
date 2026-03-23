@@ -10,7 +10,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 
 
-def tiebreak(response: dict, zip) -> dict:
+def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
     """
     If more than one result is returned by AIS, tiebreak by checking zip code.
     If no zip code is provided, return None and a flag that indicates a
@@ -20,27 +20,38 @@ def tiebreak(response: dict, zip) -> dict:
         response (dict): An AIS API response
         zip (str): The zip code present on the input data. Used
         to check API responses against.
+        strict (bool): Whether or not to return the first address or none
+        if there is more than one match
 
     Returns:
         A dict with the zipcode-matched record, or if no match, None.
     """
 
     candidates = []
-    for candidate in response.json()["features"]:
+
+    # Match only on first five of zip
+    input_zip = zip[:5] if zip else ""
+    for candidate in features:
+
         # If the AIS API zip code matches the zip code on the
         # incoming data, this record is a potential match
-        if candidate["properties"].get("zip_code", "") == zip:
+        candidate_zip = candidate.get("properties", {}).get("zip_code", "")
+        if candidate_zip == input_zip or not zip:
             candidates.append(candidate)
 
     # Sometimes AIS returns two addresses for the same lat lon
     # should write code in the future to more intelligently tiebreak
     # and behaves differently based on if the two addresses returned
     # are actually the same
-    if len(candidates) == 1:
-        return candidates[0]
 
-    else:
-        return None
+    if candidates:
+        if strict:
+            return candidates[0] if len(candidates) == 1 else None
+    
+        else:
+            return candidates[0]
+
+    return None
 
 
 def get_intersection_coords(ais_dict: dict) -> list[str, str]:
@@ -88,7 +99,6 @@ def make_coordinate_lookups(
         if response.status_code >= 500:
             raise Exception("5xx response. There may be a problem with the AIS API.")
         elif response.status_code == 429:
-            print(response.text)
             raise Exception("429 response. Too many calls to the AIS API.")
 
         elif response.status_code == 401:
@@ -101,27 +111,8 @@ def make_coordinate_lookups(
             raise ValueError(
                 f"Error occurred with the following status code: {response.status_code}"
             )
-
+         
     return out_data
-
-
-def tiebreak_coordinate_lookups(responses: list[dict], zip: str):
-    addresses = []
-
-    for response in responses:
-        candidates = response.get("features")
-        # If the AIS API zip code matches the zip code on the
-        # incoming data, this record is a potential match
-        for candidate in candidates:
-            if candidate["properties"].get("zip_code", "") == zip or not zip:
-                addresses.append(candidate)
-
-    # Sometimes AIS returns two addresses for the same lat lon
-    # should write code in the future to more intelligently tiebreak
-    # and behaves differently based on if the two addresses returned
-    # are actually the same
-    if addresses:
-        return addresses[0]
 
 def _round_coordinates(coord) -> str:
     """Round and stringify a coordinate value, returning None if invalid."""
@@ -159,7 +150,7 @@ def _fetch_ais_coordinates(
 
             # Tiebreak if multiple results
             if len(r_json["features"]) > 1:
-                feature = tiebreak(response, zip)
+                feature = tiebreak(r_json["features"], zip)
                 if not feature:
                     return None, None
                 
@@ -225,7 +216,6 @@ def ais_lookup(
     if response and response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
     elif response and response.status_code == 429:
-        print(response.text)
         raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
@@ -238,12 +228,20 @@ def ais_lookup(
         tiebroken_address = None
 
         if len(r_json["features"]) > 1 and r_json.get("search_type") == "address":
-            tiebroken_address = tiebreak(response, zip)
+            tiebroken_address = tiebreak(r_json["features"], zip, strict=True)
 
         elif r_json.get("search_type") == "intersection":
             coord_pairs = get_intersection_coords(response.json())
-            coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
-            tiebroken_address = tiebreak_coordinate_lookups(coord_lookup_results, zip)
+            
+            try:
+                coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
+                # tiebreak in a non-strict manner for coord lookups
+                tiebroken_address = tiebreak([
+                    feature for r in coord_lookup_results for feature in r.get("features", [])
+                ], zip)
+            
+            except:
+                print(f'ERROR: This address cannot be tiebroken: {address}, {zip}, {coord_pairs}')
 
         # if r_json is not longer than 1, no need to tiebreak
         elif len(r_json["features"]) == 1:
