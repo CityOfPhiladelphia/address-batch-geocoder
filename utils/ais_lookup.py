@@ -10,7 +10,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 
 
-def tiebreak(response: dict, zip) -> dict:
+def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
     """
     If more than one result is returned by AIS, tiebreak by checking zip code.
     If no zip code is provided, return None and a flag that indicates a
@@ -20,13 +20,15 @@ def tiebreak(response: dict, zip) -> dict:
         response (dict): An AIS API response
         zip (str): The zip code present on the input data. Used
         to check API responses against.
+        strict (bool): Whether or not to return the first address or none
+        if there is more than one match
 
     Returns:
         A dict with the zipcode-matched record, or if no match, None.
     """
 
     candidates = []
-    for candidate in response.json()["features"]:
+    for candidate in features:
         # If the AIS API zip code matches the zip code on the
         # incoming data, this record is a potential match
         if candidate["properties"].get("zip_code", "") == zip:
@@ -36,11 +38,15 @@ def tiebreak(response: dict, zip) -> dict:
     # should write code in the future to more intelligently tiebreak
     # and behaves differently based on if the two addresses returned
     # are actually the same
-    if len(candidates) == 1:
-        return candidates[0]
 
-    else:
-        return None
+    if candidates:
+        if strict:
+            return candidates[0] if len(candidates) == 1 else None
+    
+        else:
+            return candidates[0]
+
+    return None
 
 
 def get_intersection_coords(ais_dict: dict) -> list[str, str]:
@@ -104,25 +110,6 @@ def make_coordinate_lookups(
 
     return out_data
 
-
-def tiebreak_coordinate_lookups(responses: list[dict], zip: str):
-    addresses = []
-
-    for response in responses:
-        candidates = response.get("features")
-        # If the AIS API zip code matches the zip code on the
-        # incoming data, this record is a potential match
-        for candidate in candidates:
-            if candidate["properties"].get("zip_code", "") == zip or not zip:
-                addresses.append(candidate)
-
-    # Sometimes AIS returns two addresses for the same lat lon
-    # should write code in the future to more intelligently tiebreak
-    # and behaves differently based on if the two addresses returned
-    # are actually the same
-    if addresses:
-        return addresses[0]
-
 def _round_coordinates(coord) -> str:
     """Round and stringify a coordinate value, returning None if invalid."""
     try:
@@ -159,7 +146,7 @@ def _fetch_ais_coordinates(
 
             # Tiebreak if multiple results
             if len(r_json["features"]) > 1:
-                feature = tiebreak(response, zip)
+                feature = tiebreak(r_json["features"], zip)
                 if not feature:
                     return None, None
                 
@@ -171,6 +158,14 @@ def _fetch_ais_coordinates(
             
         return None, None
 
+# Code adapted from Alex Waldman and Roland MacDavid
+# https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
+@retry(
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=10000,
+    stop_max_attempt_number=3,
+    wait_fixed=200,
+)
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
 @retry(
@@ -211,39 +206,59 @@ def ais_lookup(
     AIS_RATE_LIMITER.wait()
 
     # Don't attempt to geocode if address is null
-    if address:
-        try:
-            quoted_address = quote(address)
-            ais_url = "https://api.phila.gov/ais/v1/search/" + quoted_address + f"?gatekeeperKey={api_key}&srid=4326&max_range=0"
-            response = sess.get(ais_url, verify=False)
-        except:
-            print(f'ERROR: This address cannot be quoted: {address}, {zip}, {original_address}')
-            response = None
-    else:
-        response = None
+    if not address:
+        out_data = {
+            'output_address': original_address if original_address else address,
+            'is_addr': existing_is_addr,
+            'is_philly_addr': existing_is_philly_addr,
+            'is_multiple_match': False,
+            'geocoder_used': None,
+        }
 
-    if response and response.status_code >= 500:
+        if fetch_4326:
+            out_data["geocode_lat"] = None
+            out_data["geocode_lon"] = None
+        
+        if fetch_2272:
+            out_data["geocode_x"] = None
+            out_data["geocode_y"] = None
+        
+        for field in enrichment_fields:
+            out_data[field] = None
+        
+        return out_data
+
+    ais_url = "https://api.phila.gov/ais/v1/search/" + quote(address) + f"?gatekeeperKey={api_key}&srid=4326&max_range=0" 
+    response = sess.get(ais_url, verify=False)
+
+    if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
-    elif response and response.status_code == 429:
+    elif response.status_code == 429:
         print(response.text)
         raise Exception("429 response. Too many calls to the AIS API.")
 
     out_data = {}
     # If status code is 200, that means API has found a match.
     # API will return a 404 if no match
-    if response and response.status_code == 200:
+    if response.status_code == 200:
         # If r_json is longer than 1, multiple matches
         # were returned and we need to tiebreak
         r_json = response.json()
         tiebroken_address = None
 
         if len(r_json["features"]) > 1 and r_json.get("search_type") == "address":
-            tiebroken_address = tiebreak(response, zip)
+            tiebroken_address = tiebreak(r_json["features"], zip, strict=True)
 
         elif r_json.get("search_type") == "intersection":
             coord_pairs = get_intersection_coords(response.json())
-            coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
-            tiebroken_address = tiebreak_coordinate_lookups(coord_lookup_results, zip)
+            
+            try:
+                coord_lookup_results = make_coordinate_lookups(sess, coord_pairs, api_key)
+                # tiebreak in a non-strict manner for coord lookups
+                tiebroken_address = tiebreak(coord_lookup_results, zip)
+            
+            except:
+                print(f'ERROR: This address cannot be tiebroken: {address}, {zip}, {coord_pairs}')
 
         # if r_json is not longer than 1, no need to tiebreak
         elif len(r_json["features"]) == 1:
