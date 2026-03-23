@@ -4,14 +4,23 @@ from pathlib import Path
 
 def detect_file_encoding(file_path: str):
     # Attempt to determine the filetype
-    # by reading the first 10kb of a file
+    # by reading the first 100kb of a file
     with open(file_path, "rb") as f:
         raw_data = f.read(100000)
 
     result = chardet.detect(raw_data)
     encoding = result["encoding"]
 
+    # If there's a utf-8 character later in the file
+    # the file will be encoded as ascii when in fact
+    # it is utf-8. Because utf-8 encompasses ascii,
+    # just return encoding as utf-8 in case
+    # we can treat ascii as utf-8 (not vice versa)
+    if encoding and encoding.lower() == "ascii":
+        encoding = "utf-8"
+
     return encoding
+
 
 
 def recode_to_utf8(src_path: str, dst_path: str, src_encoding: str) -> Path:

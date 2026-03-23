@@ -76,7 +76,7 @@ def test_address_file_match(geocoded_output):
         
         assert row["geocoder_used"].item() == "address_file"
 
-def test_tomtom_address_has_right_coordinates(geocoded_output):
+def test_tomtom_address_returns_coordinates(geocoded_output):
     city = "Lawnside"
     row = geocoded_output.filter(pl.col("address_city") == city)
 
@@ -105,4 +105,3 @@ def test_ais_match(geocoded_output):
         row = geocoded_output.filter(pl.col("street_address") == address)
         
         assert row["geocoder_used"].item() == "ais"
-

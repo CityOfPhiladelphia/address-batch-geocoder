@@ -514,8 +514,9 @@ def process_data(filepath, config):
     # after the lazy frame has been materialized.
     encoding = detect_file_encoding(filepath)
     utf8_filepath = ""
+    if encoding.lower() != "utf-8":
+        print(f"Converting file encoding from {encoding} to UTF-8")
 
-    if encoding != "UTF-8":
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False, encoding="utf-8"
         ) as temp_file:
@@ -556,7 +557,8 @@ def process_data(filepath, config):
     # fails to match
     lf = lf.with_columns(pl.col(passyunk_address_field).alias("raw_address"))
 
-    lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
+        # Collect to avoid calling passyunk parser multiple times
+        lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf).collect().lazy()
 
     # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
     # Only do this for split address fields (street/city/state/zip)
@@ -614,10 +616,13 @@ def process_data(filepath, config):
     # -------------------------- Add Fields from AIS ------------------ #
     has_geo, needs_geo = split_geos(joined_lf, config)
 
-    uses_full_address = bool(address_fields.get("full_address"))
-    ais_enriched = enrich_with_ais(
-        config, needs_geo, uses_full_address, ais_enrichment_fields
-    )
+        uses_full_address = bool(address_fields.get("full_address"))
+
+        # Collect and then convert back to lazy df to avoid multiple
+        ais_enriched = enrich_with_ais(
+            config, needs_geo, uses_full_address, ais_enrichment_fields
+        ).collect().lazy()
+        
 
     ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
@@ -631,7 +636,7 @@ def process_data(filepath, config):
         "__geocode_idx__"
     )
 
-    tomtom_enriched = enrich_with_tomtom(parser, config, needs_geo)
+        tomtom_enriched = enrich_with_tomtom(parser, config, needs_geo).collect().lazy()
 
     # -------------- Check TomTom matches against AIS again ---------------- #
     
@@ -649,7 +654,7 @@ def process_data(filepath, config):
     tomtom_enriched_non_philly = tomtom_enriched.filter(pl.col("is_non_philly"))
     tomtom_enriched_is_philly = tomtom_enriched.filter(~pl.col("is_non_philly"))
 
-    ais_reinriched = enrich_with_ais(config, tomtom_enriched_is_philly, uses_full_address, ais_enrichment_fields)
+        ais_reinriched = enrich_with_ais(config, tomtom_enriched_is_philly, uses_full_address, ais_enrichment_fields).collect().lazy()
 
     reinriched_has_geo, reinriched_needs_geo = split_geos(ais_reinriched, config)
 
