@@ -30,6 +30,7 @@ $requirements1 = Join-Path $installFolder   '.\requirements.txt'
 $repoURL = 'https://github.com/CityOfPhiladelphia/address-geocoder.git'
 $owner = "CityOfPhiladelphia"
 $repo = "address-batch-geocoder"
+$branch = "origin/frontend-test"
 
 # Exe version, used to check if we need to force user to update
 $exeVersion = "v2.0.0"
@@ -254,13 +255,13 @@ function cloneOrUpdate {
             }
             
             $localCommit = git rev-parse HEAD
-            $remoteCommit = git rev-parse "origin/frontend-test"
+            $remoteCommit = git rev-parse $branch
             
             if ($localCommit -ne $remoteCommit) {
                 Write-Host "Updates available. Pulling changes..."
                 
                 # Reset any local changes, they should always match remote
-                git reset --hard origin/frontend-test | ForEach-Object { Write-Host $_ }
+                git reset --hard $branch | ForEach-Object { Write-Host $_ }
 
                 if ($LASTEXITCODE -ne 0) {
                     Write-Host "Failed to pull updates." -ForegroundColor Red
