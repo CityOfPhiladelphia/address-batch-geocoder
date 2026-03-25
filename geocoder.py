@@ -187,7 +187,7 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
 
 def add_address_file_fields(
     geo_filepath: str, input_data: pl.LazyFrame, address_fields: list, config: dict
-) -> pl.LazyFrame:
+) -> tuple[pl.LazyFrame, dict]:
     """
     Given a list of address fields to add, adds those fields from
     the address file to each record in the input data. Does so via a
@@ -198,21 +198,28 @@ def add_address_file_fields(
         file used to geocode addresses.
         input_data: A lazyframe containing the input data to be enriched
         address_fields: A list of one or more address fields
+    
+        Returns:
+            The appended data and a dict of renamed fields if there were fieldname conflicts
     """
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
     # Check which enrichment fields would conflict with existing columns
     existing_cols = input_data.collect_schema().names()
-    enrichment_col_names = [
-        key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
+    
+    conflicts = [
+        key for key, value in POSSIBLE_FIELDS.items()
+        if value in address_fields and value in existing_cols
     ]
-    conflicts = [field for field in enrichment_col_names if field in existing_cols]
 
     # Rename conflicting input columns to _left
     if conflicts:
-        rename_input = {field: field + "_left" for field in conflicts}
+        rename_input = {POSSIBLE_FIELDS[field]: POSSIBLE_FIELDS[field] + "_left" for field in conflicts}
         input_data = input_data.rename(rename_input)
+    
+    else:
+        rename_input = {}
 
     rename_mapping = {
         value: key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
@@ -242,7 +249,7 @@ def add_address_file_fields(
         .alias("geocoder_used")
     )
 
-    return joined_lf
+    return joined_lf, rename_input
 
 
 def split_geos(data: pl.LazyFrame, config: dict):
@@ -624,9 +631,12 @@ def process_csv(config_path):
             config
         )
 
-        joined_lf = add_address_file_fields(
+        joined_lf, input_renames = add_address_file_fields(
             geo_filepath, philly_lf, address_file_enrichment_fields, config
         )
+
+        if input_renames:
+            non_philly_lf = non_philly_lf.rename(input_renames)
 
         # Split out fields that did not match the address file
         # and attempt to match them with the AIS API
