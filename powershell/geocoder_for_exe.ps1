@@ -32,7 +32,7 @@ $owner = "CityOfPhiladelphia"
 $repo = "address-batch-geocoder"
 
 # Exe version, used to check if we need to force user to update
-$exeVersion = "v1.2.0"
+$exeVersion = "v2.0.0"
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
