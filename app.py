@@ -3,12 +3,14 @@ import pandas as pd
 import os
 import tempfile
 import yaml
-from utils.enrichment_fields import ENRICHMENT_FIELDS
+from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from geocoder import process_data
 
 
 AIS_API_KEY = os.environ.get("AIS_API_KEY")
 ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
+ENRICHMENT_FIELDS = POSSIBLE_FIELDS.keys()
+
 
 # UI Configurations
 st.set_page_config(page_title="Address Batch Geocoder", 
