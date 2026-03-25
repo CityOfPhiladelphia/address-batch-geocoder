@@ -244,9 +244,9 @@ def main():
     config = {
         "AIS_API_KEY": api_key,
         "input_file": uploaded_file.name if uploaded_file else None,
-        "ADDRESS_FILE": ADDRESS_FILE,
+        "address_file": ADDRESS_FILE,
         "full_address_field": full_address_field,
-        "address_fields": address_fields or "",
+        "address_fields": address_fields,
         "enrichment_fields": enrichment_fields,
         "srid_4326": 4326 in srids,
         "srid_2272": 2272 in srids,
