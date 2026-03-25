@@ -199,15 +199,15 @@ def add_address_file_fields(
         input_data: A lazyframe containing the input data to be enriched
         address_fields: A list of one or more address fields
     
-    Returns:
-        The appended data and a dict of renamed fields if there were fieldname conflicts
+        Returns:
+            The appended data and a dict of renamed fields if there were fieldname conflicts
     """
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
     # Check which enrichment fields would conflict with existing columns
     existing_cols = input_data.collect_schema().names()
-
+    
     conflicts = [
         key for key, value in POSSIBLE_FIELDS.items()
         if value in address_fields and value in existing_cols
@@ -613,13 +613,15 @@ def process_data(filepath, config):
         config
     )
 
-    # Get joined lf and the renamed fields if there were column name conflicts
-    joined_lf, input_renames = add_address_file_fields(
-        geo_filepath, philly_lf, address_file_enrichment_fields, config
-    )
+        joined_lf, input_renames = add_address_file_fields(
+            geo_filepath, philly_lf, address_file_enrichment_fields, config
+        )
 
-    if input_renames:
-        non_philly_lf = non_philly_lf.rename(input_renames)
+        if input_renames:
+            non_philly_lf = non_philly_lf.rename(input_renames)
+
+        # Split out fields that did not match the address file
+        # and attempt to match them with the AIS API
 
 
     # Split out fields that did not match the address file
