@@ -29,7 +29,10 @@ $requirements1 = Join-Path $installFolder   '.\requirements.txt'
 # GitHub Repo info
 $repoURL = 'https://github.com/CityOfPhiladelphia/address-geocoder.git'
 $owner = "CityOfPhiladelphia"
-$repo = "address-geocoder"
+$repo = "address-batch-geocoder"
+
+# Exe version, used to check if we need to force user to update
+$exeVersion = "v1.2.0"
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
@@ -51,7 +54,20 @@ function checkToolVersion {
         $response = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 5 -ErrorAction Stop
         $remoteVersion = $response.tag_name
         
-        if ($localVersion -ne $remoteVersion) {
+        # End process if version is out of date
+        $minExeVersionFile = Join-Path $powershellDirectory 'min_exe_version.txt'
+            if (Test-Path $minExeVersionFile) {
+                $minExeVersion = (Get-Content $minExeVersionFile -Raw).Trim()
+                if ($exeVersion -lt $minExeVersion) {
+                    Write-Host "This version of the tool is no longer supported." -ForegroundColor Red
+                    Write-Host "Please download the latest version from:" -ForegroundColor Yellow
+                    Write-Host "https://github.com/$owner/$repo/releases/latest" -ForegroundColor Cyan
+                    Read-Host "Press Enter to exit"
+                    exit 1
+                }
+            }
+        
+        if ($localVersion -lt $remoteVersion) {
             $border = "=" * 70
             Write-Host ""
             Write-Host $border -ForegroundColor Yellow

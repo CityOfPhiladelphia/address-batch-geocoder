@@ -381,7 +381,11 @@ Do not commit the executable to the repo. Releasing the executable is handled vi
 
 This code is intended to be called using an executable file generated from `powershell/geocoder_for_exe.ps1`. If changes are made to this file, we need to make a new release.
 
-To create a release, make sure the commit is tagged with a version number like `v1.0.0`:
+To create a release:
+
+1. Update the exe_version variable in the ps1 file: `$exeVersion = "v1.1.0`
+2. If necessary the min_exe_version.txt in the `powershell` folder. This is the minimum version a user should be allowed to run without being forced to redownload the exe.
+3. Make sure the commit is tagged with a version number like `v1.0.0`:
 
 ```
 # When you're ready to create a release:

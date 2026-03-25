@@ -71,6 +71,8 @@ Choose an option:
 
 Press `1` to use the user interface. A window will open up in your default browser.
 
+![image-20260318114508641](C:\Users\caitlin.pratt\AppData\Roaming\Typora\typora-user-images\image-20260318114508641.png)
+
 The user interface has the following fields.
 
 1. The AIS API key. Required. Enter the AIS API key provided to you by CityGeo.
@@ -127,7 +129,7 @@ input_file: 'example.csv'
 full_address_field:
 
 address_fields:
-  street_address: addr_st
+  street: addr_st
   city: addr_city
   state:
   zip: addr_zip
@@ -166,7 +168,7 @@ full_address_field: address
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
-  street_address:
+  street:
   city:
   state:
   zip:
@@ -379,7 +381,11 @@ Do not commit the executable to the repo. Releasing the executable is handled vi
 
 This code is intended to be called using an executable file generated from `powershell/geocoder_for_exe.ps1`. If changes are made to this file, we need to make a new release.
 
-To create a release, make sure the commit is tagged with a version number like `v1.0.0`:
+To create a release:
+
+1. Update the exe_version variable in the ps1 file: `$exeVersion = "v1.1.0`
+2. If necessary the min_exe_version.txt in the `powershell` folder. This is the minimum version a user should be allowed to run without being forced to redownload the exe.
+3. Make sure the commit is tagged with a version number like `v1.0.0`:
 
 ```
 # When you're ready to create a release:
@@ -390,6 +396,7 @@ git push origin v1.0.0
 Publishing a new release will trigger the `build-and-publish` workflow, which calls the following command to create an executable file from the powershell script: `Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false`
 
 ## 5. Matching Process
+
 ```mermaid
 flowchart TB
     A["Input Address"] --> B@{ label: "Is it a Philadelphia address? If unknown, assume it's Philadelphia." }
@@ -434,4 +441,5 @@ flowchart TB
     style K fill:#FFE0B2
     style M fill:#FFE0B2
     style N fill:#FFF9C4
+
 ```
