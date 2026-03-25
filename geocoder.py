@@ -627,8 +627,6 @@ def process_data(filepath, config):
 
     # -------------------------- Add Fields from AIS ------------------ #
     has_geo, needs_geo = split_geos(joined_lf, config)
-    print("has_geo after first split:", has_geo.collect_schema().names())
-    print("needs_geo after first split:", needs_geo.collect_schema().names())
 
     uses_full_address = bool(address_fields.get("full_address"))
 
