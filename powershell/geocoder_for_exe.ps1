@@ -228,7 +228,14 @@ function cloneOrUpdate {
         Push-Location $installFolder
         
         try {
-            $null = git fetch origin 2>&1
+            git fetch origin 2>&1 | ForEach-Object { Write-Host $_}
+
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Failed to fetch updates." -ForegroundColor Red
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
             
             $localCommit = git rev-parse HEAD
             $remoteCommit = git rev-parse "origin/frontend-test"
@@ -236,25 +243,16 @@ function cloneOrUpdate {
             if ($localCommit -ne $remoteCommit) {
                 Write-Host "Updates available. Pulling changes..."
                 
-                $status = git status --porcelain
-                if ($status) {
-                    Write-Host "Local changes detected. Stashing..."
-                    $null = git stash push -m "Auto-stash before update" 2>&1
-                    $stashed = $true
-                } else {
-                    $stashed = $false
-                }
-                
-                $null = git pull origin "frontend-test" 2>&1
-                
-                # Restore stashed changes if we stashed them
-                if ($stashed) {
-                    Write-Host "Restoring local changes..."
-                    $null = git stash pop 2>&1
+                # Reset any local changes, they should always match remote
+                git reset --hard origin/frontend-test | ForEach-Object { Write-Host $_ }
+
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "Failed to pull updates." -ForegroundColor Red
+                    Read-Host "Press Enter to exit"
+                    exit 1
                 }
                 
                 Write-Host "Repository updated successfully!" -ForegroundColor Green
-                
                 $script:RepoWasUpdated = $true
             } else {
                 Write-Host "Repository is up to date."
@@ -263,16 +261,25 @@ function cloneOrUpdate {
         }
         catch {
             Write-Host "Failed to update repository: $_" -ForegroundColor Red
-            Pop-Location
+            Read-Host "Press Enter to exit"
             exit 1
         }
-        
-        Pop-Location
+
+        finally {
+            Pop-Location
+        }
+
     } else {
         Write-Host "Repository not found. Cloning..."
         
         try {
-            $null = git clone $repoURL $installFolder 2>&1
+            git clone $repoURL $installFolder 2>&1 | ForEach-Object { Write-Host $_ }
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Failed to clone repository." -ForegroundColor Red
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
             
             Write-Host "Repository cloned successfully!" -ForegroundColor Green
             
@@ -280,6 +287,8 @@ function cloneOrUpdate {
         }
         catch {
             Write-Host "Failed to clone repository: $_" -ForegroundColor Red
+            Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
+            Read-Host "Press Enter to exit"
             exit 1
         }
     }
@@ -378,6 +387,7 @@ function downloadAddressFile {
         if (Test-Path $addressFileCSV) {
             Remove-Item $addressFileCSV -Force
         }
+        Read-Host "Press Enter to exit"
         exit 1
     }
 
