@@ -71,8 +71,6 @@ Choose an option:
 
 Press `1` to use the user interface. A window will open up in your default browser.
 
-![image-20260318114508641](C:\Users\caitlin.pratt\AppData\Roaming\Typora\typora-user-images\image-20260318114508641.png)
-
 The user interface has the following fields.
 
 1. The AIS API key. Required. Enter the AIS API key provided to you by CityGeo.
