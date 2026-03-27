@@ -5,7 +5,7 @@ import tempfile
 import yaml
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from geocoder import process_data
-
+from pathlib import Path
 
 AIS_API_KEY = os.environ.get("AIS_API_KEY")
 ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
@@ -282,10 +282,13 @@ def main():
     
     if st.session_state.get("geocode_result"):
         st.success("Geocoding complete!")
+
+
+
         st.download_button(
             label="Download enriched file",
             data=st.session_state["geocode_result"],
-            file_name=f"{uploaded_file.name}_enriched.csv",
+            file_name=f"{Path(uploaded_file.name).stem}_enriched.csv",
             mime="text/csv",
             icon=":material/download:",
             on_click="ignore",
