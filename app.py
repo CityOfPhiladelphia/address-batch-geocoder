@@ -9,7 +9,7 @@ from pathlib import Path
 
 AIS_API_KEY = os.environ.get("AIS_API_KEY")
 ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
-ENRICHMENT_FIELDS = POSSIBLE_FIELDS.keys()
+ENRICHMENT_FIELDS = sorted(POSSIBLE_FIELDS.keys())
 
 
 # UI Configurations
@@ -37,7 +37,8 @@ def init_session_state():
         "state_col_default": None,
         "zip_col_default": None,
         "geocode_result": None,
-        "geocode_error": None
+        "geocode_error": None,
+        "running": False
     }
 
     for k, v in defaults.items():
@@ -84,7 +85,10 @@ def on_config_upload():
         st.session_state["city_col_default"] = address_fields.get("city")
         st.session_state["state_col_default"] = address_fields.get("state")
         st.session_state["zip_col_default"] = address_fields.get("zip")
-    
+
+def on_geocode_click():
+    st.session_state["running"] = True
+
 def call_geocoder_backend(data, config):
 
     # Write uploaded file to a temp file so process_data can work with a filepath
@@ -102,7 +106,9 @@ def call_geocoder_backend(data, config):
     finally:
         os.remove(tmp_path)
 
-    return df.write_csv().encode("utf-8")
+    # Including bom should write the file such that
+    # excel recognizes it as utf-8
+    return df.write_csv(include_bom=True)
 
 # Prevent app from rerunning when this is clicked
 @st.fragment
@@ -264,7 +270,7 @@ def main():
     )
 
     if ready_to_geocode:
-        if st.button("Geocode"):
+        if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"]):
             with st.spinner("Geocoding..."):
                 try:
                     result_bytes = call_geocoder_backend(uploaded_file, config)
@@ -274,6 +280,10 @@ def main():
                     st.session_state["geocode_error"] = f"Configuration error: {e}"
                 except Exception as e:
                     st.session_state["geocode_error"] = f"Error: {e}"
+                finally:
+                    st.session_state["running"] = False
+            
+            st.rerun()
         
         download_config(config)
     

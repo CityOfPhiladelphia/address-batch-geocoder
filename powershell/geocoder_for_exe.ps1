@@ -472,7 +472,7 @@ if ($script:RepoWasJustCloned) {
 }
 
 # Always run the geocoder if not first-time setup
-[string]$runOption = Read-Host -Prompt "Choose an option:`n[1] Run with the user-interface`n[2] Run with the .yml config`n[Any other key]: exit"
+[string]$runOption = Read-Host -Prompt "Choose an option:`n[1] Run with the user-interface`n[2] Run with the .yml config`n[Any other key]: exit`n"
 
 switch ($runOption) {
     '1' {

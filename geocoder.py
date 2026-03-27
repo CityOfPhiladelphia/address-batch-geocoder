@@ -522,8 +522,6 @@ def process_data(filepath, config):
     encoding = detect_file_encoding(filepath)
     utf8_filepath = ""
     if encoding.lower() != "utf-8":
-        print(f"Converting file encoding from {encoding} to UTF-8")
-
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False, encoding="utf-8"
         ) as temp_file:
@@ -762,7 +760,7 @@ def run_process_csv(config_path):
     try:
         # sink_csv keeps execution lazy until this point, avoiding loading
         # the full dataset into memory
-        result.sink_csv(out_path)
+        result.sink_csv(out_path, include_bom=True)
     finally:
         # Clean up temp file only after sink_csv has fully materialized the lazy frame
         if utf8_filepath:
