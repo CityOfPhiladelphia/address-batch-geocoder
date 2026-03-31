@@ -4,18 +4,14 @@ import usaddress
 import sys
 
 
-def infer_city_state_field(config_path) -> dict:
+def infer_city_state_field(config) -> dict:
     """
     Args:
-        config_path (str): The path of the config file.
+        config: The config object
 
     Returns dict: A dict mapping city and state fields to
     the field names in the user's input file
     """
-
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
     full_addr = config.get("full_address_field")
 
     if full_addr:
@@ -148,28 +144,30 @@ def is_non_philly_from_split_address(
     return flag_non_philly_address(address_data, zips)
 
 
-def find_address_fields(config_path) -> dict[str]:
+def find_address_fields(config) -> dict[str]:
     """
     Parses which address fields to consider in the input file based on
     the content of config.yml. Raises an error if neither full_address_field
     nor street are specified in the config file.
 
     Args:
-        config_path (str): The path of the config file.
+        config (dict): A config object
 
     Returns dict: A dict of address field names in the input file.
 
     """
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
     # There are two possible ways to input address in the yaml config
     # 1. Specifying a full address string (if address is stored in one column)
     # 2. Specifying a list of address fields (address, city, state, zip) for
     # if address is stored in multiple columns.
     full_addr = config.get("full_address_field")
 
-    addr_fields = config.get("address_fields")
+    addr_fields = config.get("address_fields") or {}
+
+    # street_address used to be called street, adding this for backward compatibility
+    # in case someone hasn't updated their config file to call it street_address
+    if addr_fields.get("street") and not addr_fields.get("street_address"):
+        addr_fields["street_address"] = addr_fields.pop("street")
 
     # If user has not specified an address field, raise
     if not full_addr and not any(addr_fields.values()):
@@ -202,12 +200,15 @@ def find_address_fields(config_path) -> dict[str]:
             else:
                 print("Exiting program...")
                 sys.exit()
-
-    if not addr_fields.get("street"):
+    
+    if full_addr:
+        return {"full_address": full_addr}
+    
+    if not addr_fields.get("street_address"):
         raise ValueError(
             "When full address field is not specified, "
             "address_fields must include a non-null value for "
-            "street."
+            "street_address."
         )
 
     fields = addr_fields
@@ -238,28 +239,36 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     and a boolean value indicating if the address is a valid Philadelphia
     address.
     """
-    prsd = parser.parse(address)
-    parsed = prsd["components"]
 
-    has_street_code = False
-    for street in ("street", "street_2"):
-        sc = parsed.get(street, {}).get("street_code")
-        if sc:
-            has_street_code = True
-            break
+    try:
+        prsd = parser.parse(address)
+        parsed = prsd["components"]
+    
+        has_street_code = False
+        for street in ("street", "street_2"):
+            sc = parsed.get(street, {}).get("street_code")
+            if sc:
+                has_street_code = True
+                break
 
-    # If address matches to a street code, it is a philly address
-    is_addr = bool(has_street_code)
-    is_philly_addr = bool(has_street_code)
+        # If address matches to a street code, it is a philly address
+        is_addr = bool(has_street_code)
+        is_philly_addr = bool(has_street_code)
 
-    output_address = (
-        parsed.get("output_address", address) if is_philly_addr else address
-    )
+        output_address = (
+            parsed.get("output_address", address) if is_philly_addr else address
+        )
+    
+    # Handle Passyunk parsing edge cases
+    except Exception as e:
+        output_address = address
+        is_addr = False
+        is_philly_addr = False
 
     return {
         "output_address": output_address,
         "is_addr": is_addr,
         "is_philly_addr": is_philly_addr,
         "is_multiple_match": False,
-        "match_type": None,
+        "geocoder_used": None,
     }

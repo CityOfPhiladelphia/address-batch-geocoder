@@ -105,13 +105,13 @@ typing-extensions==4.15.0
     #   black
     #   exceptiongroup
     #   ipython
-urllib3==2.6.0
+urllib3==2.6.3
     # via requests
 usaddress==0.5.16
     # via address-geocoder (pyproject.toml)
 wcwidth==0.2.14
     # via prompt-toolkit
-wheel==0.45.1
+wheel==0.46.2
     # via address-geocoder (pyproject.toml)
 zipp==3.23.0
     # via importlib-metadata

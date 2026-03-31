@@ -2,7 +2,7 @@ import os
 
 # Set thread pool size to 1 to avoid API rate limits
 # This needs to be set before polars is imported
-os.environ["POLARS_MAX_THREADS"] = "1"
+# os.environ["POLARS_MAX_THREADS"] = "1"
 
 import yaml
 import polars as pl
@@ -33,7 +33,7 @@ def get_current_time():
     return current_datetime.strftime("%H:%M:%S")
 
 
-def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
+def split_non_philly_address(config, lf: pl.LazyFrame) -> pl.LazyFrame:
     """
     Given a polars LazyFrame, splits into two lazy frames:
     One for addresses located in Philadelphia, one for addresses
@@ -43,7 +43,7 @@ def split_non_philly_address(config_path, lf: pl.LazyFrame) -> pl.LazyFrame:
         (philly_lf, non_philly_lf)
     """
 
-    fields = infer_city_state_field(config_path)
+    fields = infer_city_state_field(config)
 
     # If we are using full address field, we need to look up
     # against us-address.
@@ -123,7 +123,7 @@ def parse_with_passyunk_parser(
             pl.Field("is_addr", pl.Boolean),
             pl.Field("is_philly_addr", pl.Boolean),
             pl.Field("is_multiple_match", pl.Boolean),
-            pl.Field("match_type", pl.String),
+            pl.Field("geocoder_used", pl.String),
         ]
     )
 
@@ -148,35 +148,46 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     Returns: A tuple with AIS fieldnames and address file fieldnames.
     """
     ais_enrichment_fields = config["enrichment_fields"]
-
-    invalid_fields = [
-        item for item in ais_enrichment_fields if item not in POSSIBLE_FIELDS.keys()
-    ]
-
-    if invalid_fields:
-        to_print = ", ".join(field for field in invalid_fields)
-        raise ValueError(
-            "The following fields are not available:"
-            f"{to_print}. Please correct these and try again."
-        )
-
     address_file_fields = []
 
-    [
-        address_file_fields.append(POSSIBLE_FIELDS[item])
-        for item in ais_enrichment_fields
-    ]
+    # Only append enrichment fields if set to avoid NoneType Error
+    if ais_enrichment_fields:
+        invalid_fields = [
+            item for item in ais_enrichment_fields if item not in POSSIBLE_FIELDS.keys()
+        ]
+
+        if invalid_fields:
+            to_print = ", ".join(field for field in invalid_fields)
+            raise ValueError(
+                "The following fields are not available:"
+                f"{to_print}. Please correct these and try again."
+            )
+
+        [
+            address_file_fields.append(POSSIBLE_FIELDS[item])
+            for item in ais_enrichment_fields
+        ]
 
     # Need street_address for joining
-    address_file_fields.extend(["street_address", "geocode_lat", "geocode_lon"])
+    address_file_fields.append("street_address")
+
+    # Add coordinate fields based on config
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+
+    if srid_4326:
+        address_file_fields.extend(["geocode_lat", "geocode_lon"])
+    if srid_2272:
+        address_file_fields.extend(["geocode_x", "geocode_y"])
 
     # Avoid issues if user specifies a field more than once
-    return (set(ais_enrichment_fields), set(address_file_fields))
+    # Return empty set if no enrichment fields set
+    return (set(ais_enrichment_fields) if ais_enrichment_fields else set(), set(address_file_fields))
 
 
 def add_address_file_fields(
-    geo_filepath: str, input_data: pl.LazyFrame, address_fields: list
-) -> pl.LazyFrame:
+    geo_filepath: str, input_data: pl.LazyFrame, address_fields: list, config: dict
+) -> tuple[pl.LazyFrame, dict]:
     """
     Given a list of address fields to add, adds those fields from
     the address file to each record in the input data. Does so via a
@@ -187,21 +198,28 @@ def add_address_file_fields(
         file used to geocode addresses.
         input_data: A lazyframe containing the input data to be enriched
         address_fields: A list of one or more address fields
+    
+        Returns:
+            The appended data and a dict of renamed fields if there were fieldname conflicts
     """
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
     # Check which enrichment fields would conflict with existing columns
     existing_cols = input_data.collect_schema().names()
-    enrichment_col_names = [
-        key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
+    
+    conflicts = [
+        key for key, value in POSSIBLE_FIELDS.items()
+        if value in address_fields and value in existing_cols
     ]
-    conflicts = [field for field in enrichment_col_names if field in existing_cols]
 
     # Rename conflicting input columns to _left
     if conflicts:
-        rename_input = {field: field + "_left" for field in conflicts}
+        rename_input = {POSSIBLE_FIELDS[field]: POSSIBLE_FIELDS[field] + "_left" for field in conflicts}
         input_data = input_data.rename(rename_input)
+    
+    else:
+        rename_input = {}
 
     rename_mapping = {
         value: key for key, value in POSSIBLE_FIELDS.items() if value in address_fields
@@ -211,31 +229,58 @@ def add_address_file_fields(
         addresses, how="left", left_on="output_address", right_on="street_address"
     ).rename(rename_mapping)
 
-    # If geocode is not null, then there is a match.
-    # mark the match type as address file
+    # Mark match type as address_file if we got coordinates from the file
+    # Check whichever SRID is enabled
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+    
+    if srid_4326:
+        match_condition = pl.col("geocode_lat").is_not_null()
+    elif srid_2272:
+        match_condition = pl.col("geocode_x").is_not_null()
+    else:
+        # This shouldn't happen due to earlier validation, but just in case
+        raise ValueError("At least one SRID must be enabled")
+    
     joined_lf = joined_lf.with_columns(
-        pl.when(pl.col("geocode_lat").is_not_null())
+        pl.when(match_condition)
         .then(pl.lit("address_file"))
-        .otherwise("match_type")
-        .alias("match_type")
+        .otherwise("geocoder_used")
+        .alias("geocoder_used")
     )
 
-    return joined_lf
+    return joined_lf, rename_input
 
 
-def split_geos(data: pl.LazyFrame):
+def split_geos(data: pl.LazyFrame, config: dict):
     """
     Splits a lazyframe into two lazy frames: one for records with latitude
     and longitude, and another for records without latitude and longitude.
     Used to determine which records need to be added using AIS.
     """
-    has_geo = data.filter(
-        (~pl.col("geocode_lat").is_null()) & (~pl.col("geocode_lon").is_null())
-    )
-    needs_geo = data.filter(
-        (pl.col("geocode_lat").is_null()) | (pl.col("geocode_lon").is_null())
-    )
 
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+
+    if srid_4326:
+        has_geo = data.filter(
+            (~pl.col("geocode_lat").is_null()) & (~pl.col("geocode_lon").is_null())
+        )
+        needs_geo = data.filter(
+            (pl.col("geocode_lat").is_null()) | (pl.col("geocode_lon").is_null())
+        )
+    
+    elif srid_2272:
+        has_geo = data.filter(
+            (~pl.col("geocode_x").is_null()) & (~pl.col("geocode_y").is_null())
+        )
+        needs_geo = data.filter(
+            (pl.col("geocode_x").is_null()) | (pl.col("geocode_y").is_null())
+        )
+    
+    else:
+        raise ValueError("Either SRID 4326 or SRID 2272 must be specified.")
+    
     return (has_geo, needs_geo)
 
 
@@ -259,25 +304,41 @@ def enrich_with_ais(
 
     # Created augmented address for undefined locations
     to_add = to_add.with_columns(
-        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
+        pl.when(pl.col("is_undefined"))
         .then(pl.concat_str([pl.col("output_address"), pl.lit(", Philadelphia, PA")]))
         .otherwise(pl.col("output_address"))
         .alias("api_address")
     )
 
-    # Create a new struct of columns to add
-    new_cols = pl.Struct(
-        [
-            pl.Field("output_address", pl.String),
-            pl.Field("is_addr", pl.Boolean),
-            pl.Field("is_philly_addr", pl.Boolean),
+    # Build struct based on config
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+
+    struct_fields = [
+    pl.Field("output_address", pl.String),
+    pl.Field("is_addr", pl.Boolean),
+    pl.Field("is_philly_addr", pl.Boolean),
+    pl.Field("is_multiple_match", pl.Boolean),
+    pl.Field("geocoder_used", pl.String),
+]
+
+    if srid_4326:
+        struct_fields.extend([
             pl.Field("geocode_lat", pl.String),
-            pl.Field("geocode_lon", pl.String),
-            pl.Field("is_multiple_match", pl.Boolean),
-            pl.Field("match_type", pl.String),
-            *[pl.Field(field, pl.String) for field in enrichment_fields],
-        ]
-    )
+            pl.Field("geocode_lon", pl.String)
+        ])
+
+    if srid_2272:
+        struct_fields.extend([
+            pl.Field("geocode_x", pl.String),
+            pl.Field("geocode_y", pl.String),
+        ])
+
+    struct_fields.extend([
+        *[pl.Field(field, pl.String) for field in enrichment_fields]
+    ])
+
+    new_cols = pl.Struct(struct_fields)
 
     API_KEY = config.get("AIS_API_KEY")
     field_names = [f.name for f in new_cols.fields]
@@ -308,6 +369,8 @@ def enrich_with_ais(
                     s["is_addr"],
                     s["is_philly_addr"],
                     s["output_address"],
+                    srid_4326,
+                    srid_2272
                 ),
                 return_dtype=new_cols,
             )
@@ -324,6 +387,8 @@ def enrich_with_ais(
                     s["is_addr"],
                     s["is_philly_addr"],
                     s["output_address"],
+                    srid_4326,
+                    srid_2272
                 ),
                 return_dtype=new_cols,
             )
@@ -341,66 +406,81 @@ def enrich_with_ais(
     return added
 
 
-def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
+def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFrame:
     """
     Enrich a lazy frame with latitude and longitude from TomTom.
 
     Args:
         parser: A passyunk parser object. Used to standardize TomTom output.
+        config: A dictionary containing config information
         to_add: A polars lazyframe to be enriched
 
     Returns:
-        An enriched polars layzframe.
+        An enriched polars lazyframe.
     """
 
-    # Created augmented address for undefined locations
+    # Create augmented address for undefined locations
+    
     to_add = to_add.with_columns(
-        pl.when(pl.col("is_undefined") & pl.col("is_addr"))
-        .then(pl.concat_str([pl.col("joined_address"), pl.lit(", Philadelphia, PA")]))
-        .otherwise(pl.col("joined_address"))
-        .alias("api_address")
+        pl.when(pl.col("is_undefined"))
+        .then(pl.concat_str([pl.col("raw_address"), pl.lit(", Philadelphia, PA")]))
+        .otherwise(pl.col("raw_address"))
+        .alias("raw_api_address")
     )
 
-    new_cols = pl.Struct(
-        [
-            pl.Field("output_address", pl.String),
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+
+    struct_fields = [
+        pl.Field("output_address", pl.String),
+        pl.Field("geocoder_used", pl.String),
+        pl.Field("is_addr", pl.Boolean),
+        pl.Field("is_philly_addr", pl.Boolean),
+    ]
+
+    if srid_4326:
+        struct_fields.extend([
             pl.Field("geocode_lat", pl.String),
             pl.Field("geocode_lon", pl.String),
-            pl.Field("match_type", pl.String),
-            pl.Field("is_addr", pl.Boolean),
-            pl.Field("is_philly_addr", pl.Boolean),
-        ]
-    )
-
+        ])
+    
+    if srid_2272:
+        struct_fields.extend([
+            pl.Field("geocode_x", pl.String),
+            pl.Field("geocode_y", pl.String)
+        ])
+    
+    new_cols = pl.Struct(struct_fields)
     field_names = [f.name for f in new_cols.fields]
 
     with requests.Session() as sess:
-        with pl.Config(set_streaming_chunk_size=1):
-            added = (
-                # Use the joined address for tomtom, as passyunk parser strips
-                # state, city information
-                to_add.with_columns(
-                    pl.struct(["api_address", "output_address"])
-                    .map_elements(
-                        lambda cols: tomtom_lookup(
-                            sess,
-                            parser,
-                            ZIPS,
-                            cols["api_address"],
-                            cols["output_address"],
-                        ),
-                        return_dtype=new_cols,
-                    )
-                    .alias("tomtom_struct")
+        added = (
+            # Use the joined raw (not parsed with passyunk) address for tomtom, as passyunk parser 
+            # may sometimes strip out key information
+            to_add.with_columns(
+                pl.struct(["raw_api_address", "output_address"])
+                .map_elements(
+                    lambda cols: tomtom_lookup(
+                        sess,
+                        parser,
+                        ZIPS,
+                        cols["raw_api_address"],
+                        cols["output_address"],
+                        srid_4326,
+                        srid_2272,
+                    ),
+                    return_dtype=new_cols,
                 )
-                .with_columns(
-                    *[
-                        pl.col("tomtom_struct").struct.field(n).alias(n)
-                        for n in field_names
-                    ]
-                )
-                .drop("tomtom_struct", "api_address")
+                .alias("tomtom_struct")
             )
+            .with_columns(
+                *[
+                    pl.col("tomtom_struct").struct.field(n).alias(n)
+                    for n in field_names
+                ]
+            )
+            .drop("tomtom_struct", "raw_api_address")
+        )
 
     return added
 
@@ -413,19 +493,28 @@ def enrich_with_tomtom(parser, to_add: pl.LazyFrame) -> pl.LazyFrame:
     show_default="./config.yml",
     help="The path to the config file.",
 )
-def process_csv(config_path) -> pl.LazyFrame:
+def process_csv(config_path):
     """
     Given a config file with the csv filepath, normalizes records
     in that file using Passyunk.
 
     Args:
         config_path (str): The path to the config file
-        chunksize (int): Batch size for file reading
-
-    Returns: A polars lazy dataframe
     """
+    current_time = get_current_time()
+    print(f"Beginning enrichment process at {current_time}.")
+    
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+    
+    srid_4326 = config.get("srid_4326")
+    srid_2272 = config.get("srid_2272")
+    
+    if not srid_4326 and not srid_2272:
+        raise ValueError(
+            "Invalid configuration: At least one SRID must be enabled. "
+            "Set srid_4326 or srid_2272 to true in your config file."
+        )
 
     filepath = config.get("input_file")
     geo_filepath = config.get("geography_file")
@@ -439,7 +528,7 @@ def process_csv(config_path) -> pl.LazyFrame:
         )
 
     # Determine which fields in the file are the address fields
-    address_fields = find_address_fields(config_path)
+    address_fields = find_address_fields(config)
 
     # Detect input file encoding
     encoding = detect_file_encoding(filepath)
@@ -449,7 +538,7 @@ def process_csv(config_path) -> pl.LazyFrame:
 
     # If encoding is not UTF-8, recode it
     utf8_filepath = ""
-    if encoding != "UTF-8":
+    if encoding.lower() != "utf-8":
         print(f"Converting file encoding from {encoding} to UTF-8")
 
         with tempfile.NamedTemporaryFile(
@@ -485,29 +574,22 @@ def process_csv(config_path) -> pl.LazyFrame:
 
         passyunk_address_field = address_fields.get(
             "full_address"
-        ) or address_fields.get("street")
-
-        current_time = get_current_time()
-        print(f"Joining addresses to address file at {current_time}.")
-        # # Concatenate address fields, strip extra spaces
-        # lf = lf.with_columns(
-        #     pl.concat_str(
-        #         [pl.col(field).fill_null("") for field in address_fields_list],
-        #         separator=" ",
-        #     )
-        #     .str.replace_all(r"\s+", " ")
-        #     .str.strip_chars()
-        #     .alias("joined_address")
-        # )
+        ) or address_fields.get("street_address")
 
         parser = PassyunkParser()
+        
+        # Create raw address field, used later to attempt to match
+        # raw address against TomTom if the passyunk parsed address
+        # fails to match
+        lf = lf.with_columns(pl.col(passyunk_address_field).alias("raw_address"))
 
-        lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf)
+        # Collect to avoid calling passyunk parser multiple times
+        lf = parse_with_passyunk_parser(parser, passyunk_address_field, lf).collect().lazy()
 
         # After parsing with Passyunk, rebuild joined_address using the cleaned output_address
         # Only do this for split address fields (street/city/state/zip)
         # Don't do this for full_address fields, as Passyunk strips city/state
-        if "street" in address_fields.keys():
+        if "street_address" in address_fields.keys():
             # Build list of available location components
             location_components = []
             for key in ["city", "state", "zip"]:
@@ -527,16 +609,21 @@ def process_csv(config_path) -> pl.LazyFrame:
                     .str.strip_chars()
                 )
                 .otherwise(pl.col(passyunk_address_field))
-                .alias("joined_address")
+                .alias("joined_address"),
+
+                pl.concat_str(
+                [pl.col("raw_address")] + location_components,
+                separator=" ",
+                ).str.replace_all(r"\s+", " ")\
+                    .str.strip_chars()\
+                        .alias("raw_address"),  # overwrite raw_address in place
             )
         else:
             # For full_address cases, use the original field as joined_address
             lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
 
         # ---------------- Split out Non Philly Addresses -------------------#
-        current_time = get_current_time()
-        print(f"Identifying non-Philadelphia addresses at {current_time}.")
-        philly_lf, non_philly_lf = split_non_philly_address(config_path, lf)
+        philly_lf, non_philly_lf = split_non_philly_address(config, lf)
 
         # Generate the names of columns to add for both the AIS API
         # and the address file
@@ -544,32 +631,32 @@ def process_csv(config_path) -> pl.LazyFrame:
             config
         )
 
-        joined_lf = add_address_file_fields(
-            geo_filepath, philly_lf, address_file_enrichment_fields
+        joined_lf, input_renames = add_address_file_fields(
+            geo_filepath, philly_lf, address_file_enrichment_fields, config
         )
+
+        if input_renames:
+            non_philly_lf = non_philly_lf.rename(input_renames)
 
         # Split out fields that did not match the address file
         # and attempt to match them with the AIS API
 
         # -------------------------- Add Fields from AIS ------------------ #
-        current_time = get_current_time()
-        print(f"Adding fields from AIS at {get_current_time()}")
-
-        has_geo, needs_geo = split_geos(joined_lf)
+        has_geo, needs_geo = split_geos(joined_lf, config)
 
         uses_full_address = bool(address_fields.get("full_address"))
+
+        # Collect and then convert back to lazy df to avoid multiple
         ais_enriched = enrich_with_ais(
             config, needs_geo, uses_full_address, ais_enrichment_fields
-        )
+        ).collect().lazy()
+        
 
         ais_rejoined = pl.concat([has_geo, ais_enriched]).sort("__geocode_idx__")
 
         # -------------- Check Match Failures Against TomTom ------------------ #
 
-        has_geo, needs_geo = split_geos(ais_rejoined)
-
-        current_time = get_current_time()
-        print(f"Adding fields from TomTom at {get_current_time()}")
+        has_geo, needs_geo = split_geos(ais_rejoined, config)
 
         # Rejoin the addresses marked as non-philly for tomtom search
         # at the beginning of the process
@@ -577,16 +664,79 @@ def process_csv(config_path) -> pl.LazyFrame:
             "__geocode_idx__"
         )
 
-        tomtom_enriched = enrich_with_tomtom(parser, needs_geo)
+        tomtom_enriched = enrich_with_tomtom(parser, config, needs_geo).collect().lazy()
+
+        # -------------- Check TomTom matches against AIS again ---------------- #
+        
+        # This melted my brain a little bit so I'm writing it out here:
+        # 1. We see which records that TomTom failed to match are in Philly
+        # 2. We reinrich those with AIS to see if the new TomTom parsed address is
+        # searchable with AIS, allowing us to potentially recover enrichment fields
+        # 3. That either geocodes or doesn't. We take the records that AIS failed to geocode.
+        # 4. We use the tomtom matched record for the records that AIS failed to geocode.
+        # 5. We rejoin those to the records that AIS did manage to reinrich
+        # 6. We rejoin those records to the non-philadelphia records that shouldn't be run through AIS
+        # 7. We rejoin that again back to the original 'has_geo' -- the records that never needed
+        # to be matched to TomTom in the first place.
+
+        tomtom_enriched_non_philly = tomtom_enriched.filter(pl.col("is_non_philly"))
+        tomtom_enriched_is_philly = tomtom_enriched.filter(~pl.col("is_non_philly"))
+
+        ais_reinriched = enrich_with_ais(config, tomtom_enriched_is_philly, uses_full_address, ais_enrichment_fields).collect().lazy()
+
+        reinriched_has_geo, reinriched_needs_geo = split_geos(ais_reinriched, config)
+
+        # Indicate that the record was geocoded with a combination of tomtom and AIS
+        reinriched_has_geo = reinriched_has_geo.with_columns(
+            pl.col("geocoder_used").str.replace("ais", "tomtom-ais").alias("geocoder_used")
+        )
+
+        failed_idx = reinriched_needs_geo.select("__geocode_idx__")
+        
+        tomtom_fallback = tomtom_enriched.join(failed_idx, on="__geocode_idx__", how="inner")
+
+        cols = tomtom_enriched.collect_schema().names()
+
+        # Make sure rejoined tables have same fields in same order
+        reinriched_rejoined = pl.concat([reinriched_has_geo, tomtom_fallback], how="diagonal").select(cols)
+        non_philly_rejoined = pl.concat([tomtom_enriched_non_philly, reinriched_rejoined], how="diagonal").select(cols)
 
         rejoined = (
-            pl.concat([has_geo, tomtom_enriched])
+            pl.concat([has_geo, non_philly_rejoined])
             .sort("__geocode_idx__")
             .drop(
-                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined"]
+                ["__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"]
             )
         )
 
+        # Reorder fields so that all geocode fields are adjacent
+        final_cols = rejoined.collect_schema().names()
+
+        # Remove all geocode columns from the list
+        geo_cols = []
+        if srid_4326:
+            geo_cols.extend(["geocode_lat", "geocode_lon"])
+        
+        if srid_2272:
+            geo_cols.extend(["geocode_x", "geocode_y"])
+
+        cols_without_geo = [c for c in final_cols if c not in geo_cols]
+        
+        if "geocoder_used" in cols_without_geo:
+            insert_idx = cols_without_geo.index("geocoder_used") + 1
+        else:
+            insert_idx = 0
+        
+        # Insert all geocode columns together after geocoder_used
+        ordered_cols = (
+            cols_without_geo[:insert_idx] + 
+            geo_cols + 
+            cols_without_geo[insert_idx:]
+        )
+        
+        # Drop raw address field, no longer need it after tomtom match
+        rejoined = rejoined.select(ordered_cols)
+        
         # -------------------- Save Output File ---------------------- #
 
         in_path = PurePath(original_filepath)

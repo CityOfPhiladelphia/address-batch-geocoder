@@ -28,12 +28,28 @@ jobs:
       run: |
         $scriptFile = 'powershell/geocoder_for_exe.ps1'
         $outputExe = 'geocoder.exe'
-        Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole
+        Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false
 
+    - name: Save Release Info
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}"
+        $version | Out-File -FilePath "release.txt" -Encoding UTF8 -NoNewline
+        Write-Host "Created release.txt with version: $version"
+    
+    - name: Create Release ZIP
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}"
+        $zipName = "geocoder-$version.zip"
+        Compress-Archive -Path geocoder.exe, release.txt -DestinationPath $zipName
+        Write-Host "Created $zipName"
+    
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
       with:
-        files: geocoder.exe
+        files: geocoder-${{ github.ref_name }}.zip
         draft: false
         prerelease: false
         generate_release_notes: true

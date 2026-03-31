@@ -1,5 +1,5 @@
-# address-geocoder
-A tool to standardize and geocode Philadelphia addresses
+# address-batch-geocoder
+A tool to standardize and geocode Philadelphia addresses. Four geocode fields are returned: `geocode_lat` and `geocode_lon` are in the EPSG:4326 coordinate system, and `geocode_x` and `geocode_y` are in the EPSG:2272 coordinate system.
 
 ## 1. Setup
 You will need the following things:
@@ -9,7 +9,7 @@ You will need the following things:
 
 To download, use git:
 ```
-git clone git@github.com:CityOfPhiladelphia/address-geocoder.git
+git clone git@github.com:CityOfPhiladelphia/address-batch-geocoder.git
 ```
 If you have not set up authentication with git on your machine before, reference this [guidance on GitHub](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 
@@ -86,7 +86,7 @@ address_fields:
   zip: addr_zip
 ```
 5. List which fields other than latitude and longitude you want to add.
-(Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
+(Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again. Enrichment fields will only be populated for Philadelphia addresses that match to the address file, or are geocoded by the AIS API.
 A complete list of valid fields can be found further down in this README. 
 
 ```
@@ -94,6 +94,14 @@ enrichment_fields:
   - census_tract_2020
   - census_block_group_2020
   - census_block_2020
+```
+
+6. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
+
+```
+# Which SRIDs to return for geocoding
+srid_4326: true
+srid_2272: true
 ```
 
 The full config file should look something like this:
@@ -119,11 +127,14 @@ enrichment_fields:
   - census_tract_2020
   - census_block_group_2020
   - census_block_2020
-```
 
-Note that if one of the input fields has a column the same name as 
 
-6. You're now ready to run the geocoder:
+# Which SRIDs to return for geocoding
+srid_4326: true
+srid_2272: true
+``` 
+
+7. You're now ready to run the geocoder:
 
 ```
 python3 geocoder.py
@@ -135,7 +146,7 @@ keep the default config file ('./config.yml')
 The output file will be saved in the same location as your input file, with _enriched attached to the filename.
 
 ## How The Geocoder Works
-`Address-Geocoder` processes a csv file with addresses, and geolocates those
+`Address-Batch-Geocoder` processes a csv file with addresses, and geolocates those
 addresses using the following steps:
 
 1. Takes an input file of addresses, and standardizes those 
@@ -143,11 +154,17 @@ addresses using `passyunk`, Philadelphia's address standardization system.
 2. Compares the standardized data to a local parquet file, `addresses.parquet`,
 and adds the user-specified fields as well as latitude and longitude from that file
 3. Not all records will match to the address file. For those records that do not match,
-`Address-Geocoder` queries the Address Information System (AIS) API and adds returned fields.
+`Address-Batch-Geocoder` queries the Address Information System (AIS) API and adds returned fields.
 Please note that this process can take some time, so processing large files with a messy address field
 is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take
 approximately 3-4 minutes.
-5. The enriched file is then saved to the same directory as the input file.
+4. Records that don't match to the AIS API are then queried against TomTom, which has different address parsing
+capabilities and is also able to return 
+5. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
+6. The enriched file is then saved to the same directory as the input file.
+
+
+The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
 ## Testing
 This package uses the pytest module to conduct unit tests. Tests are
@@ -165,7 +182,27 @@ python3 pytest tests/test_parser.py
 
 To run one test within a file:
 ```
-python3 pytest tests/test_parser.py::test_parse_address#
+python3 pytest tests/test_parser.py::test_parse_address
+```
+
+### Running the end to end test
+To run the full suite of end to end tests, you will need to export an environment variable with the AIS API KEY. Otherwise, some tests will be skipped.
+
+In mac/linux:
+```
+export AIS_API_KEY="<AIS_API_KEY>"
+```
+
+To do this permanently, you'll need to edit the shell configuration file.
+
+In powershell:
+```
+$env:AIS_API_KEY = "<AIS_API_KEY>"
+```
+
+To do so permanently in powershell:
+```
+[System.Environment]::SetEnvironmentVariable("VARIABLE_NAME", "value", [System.EnvironmentVariableTarget]::User)
 ```
 
 ## Publishing a Release
@@ -183,6 +220,7 @@ git push origin v1.0.0
 ## Enrichment Fields
 Note that if any of the fields in the input file have the same name as
 an enrichment field, the incoming input file field will be renamed to have the _left suffix.
+Enrichment fields will only be populated for Philadelphia addresses that match to the address file, or are geocoded by the AIS API.
 
 | `Field` |
 | --- |
@@ -222,9 +260,6 @@ an enrichment field, the incoming input file field will be renamed to have the _
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
-|`opa_account_num`|
-|`opa_address`|
-|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
@@ -233,7 +268,6 @@ an enrichment field, the incoming input file field will be renamed to have the _
 |`political_division`|
 |`political_ward`|
 |`ppr_friends`|
-|`pwd_account_nums`|
 |`pwd_center_city_district`|
 |`pwd_maint_district`|
 |`pwd_parcel_id`|
@@ -277,7 +311,7 @@ flowchart TB
     B -- No --> D["Match to TomTom"]
     C -- Match --> E["Return geocoded address with enrichment fields"]
     C -- No Match --> F["Is the address an intersection?"]
-    D -- Match --> G["Return geocoded address, but no enrichment fields"]
+    D -- Match --> G["Is it a Philadelphia address?"]
     D -- No Match --> H["Return non-match"]
     F -- Yes --> I["Get intersection latitude and longitude from AIS"]
     F -- No --> J["Run AIS address match"]
@@ -285,26 +319,33 @@ flowchart TB
     J -- Match --> E
     J -- No Match --> D
     K --> J
-
+    G -- Yes --> M["Rerun AIS Match"]
+    G -- No --> N["Return geocoded address, but no enrichment fields"]
+    M -- Match --> E
+    M -- No Match --> N
     A@{ shape: manual-input}
     B@{ shape: decision}
     C@{ shape: process}
     D@{ shape: process}
     E@{ shape: terminal}
     F@{ shape: decision}
-    G@{ shape: terminal}
+    G@{ shape: decision}
     H@{ shape: terminal}
     I@{ shape: process}
     J@{ shape: process}
     K@{ shape: process}
+    M@{ shape: process}
+    N@{ shape: terminal}
     style B fill:#BBDEFB
     style C fill:#FFE0B2
     style D fill:#FFE0B2
     style E fill:#C8E6C9
     style F fill:#BBDEFB
-    style G fill:#FFF9C4
+    style G fill:#BBDEFB
     style H fill:#FFCDD2
     style I fill:#FFE0B2
     style J fill:#FFE0B2
     style K fill:#FFE0B2
+    style M fill:#FFE0B2
+    style N fill:#FFF9C4
 ```
