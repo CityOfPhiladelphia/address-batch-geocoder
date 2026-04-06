@@ -260,6 +260,9 @@ Enrichment fields will only be populated for Philadelphia addresses that match t
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
+|`opa_account_num`|
+|`opa_address`|
+|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
