@@ -517,7 +517,7 @@ def process_csv(config_path):
         )
 
     filepath = config.get("input_file")
-    geo_filepath = config.get("geography_file")
+    geo_filepath = config.get("geography_file") or config.get("address_file")
 
     if not filepath:
         raise ValueError("An input filepath must be specified in the config file.")
