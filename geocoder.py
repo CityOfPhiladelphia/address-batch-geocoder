@@ -506,7 +506,11 @@ def process_data(filepath, config):
             "Set srid_4326 or srid_2272 to true in your config file."
         )
 
-    geo_filepath = config.get("address_file")
+    filepath = config.get("input_file")
+    geo_filepath = config.get("geography_file") or config.get("address_file")
+
+    if not filepath:
+        raise ValueError("An input filepath must be specified in the config file.")
 
     if not geo_filepath:
         raise ValueError(

@@ -1,3 +1,6 @@
+# Geocoder Powershell Script
+#####
+
 # Get the directory of the currently executing script
 $ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path) 
 $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
@@ -415,7 +418,7 @@ function downloadAddressFile {
     }
    
     # Convert address file to parquet if no parquet file present
-    if (-Not (Test-Path $addressFileParquet)) {   
+    if (-Not (Test-Path $addressFileParquet) -or ($script:FileIsOutOfDate)) {   
         Write-Host "Converting address csv into a parquet file for speed and space optimization" -ForegroundColor Yellow
         
         & $venvPython -u $toParquetPy --input_path $addressFileCSV --output_path $addressFileParquet

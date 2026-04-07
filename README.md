@@ -127,7 +127,7 @@ input_file: 'example.csv'
 full_address_field:
 
 address_fields:
-  street: addr_st
+  street_address: addr_st
   city: addr_city
   state:
   zip: addr_zip
@@ -166,7 +166,7 @@ full_address_field: address
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
-  street:
+  street_address:
   city:
   state:
   zip:
@@ -274,6 +274,9 @@ Once the file is configured, run:
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
+|`opa_account_num`|
+|`opa_address`|
+|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
