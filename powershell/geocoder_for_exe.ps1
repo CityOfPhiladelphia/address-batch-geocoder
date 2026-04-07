@@ -204,18 +204,19 @@ function installUv {
 function createVenvAndConfig {
     Write-Host "Setting up virtual environment and packages..."
     
+    # Check if existing venv uses the wrong Python version and nuke it
+    if (Test-Path $venvPython) {
+        $venvVersion = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
+        if ($venvVersion -ne "3.11") {
+            Write-Host "Virtual environment is Python $venvVersion, expected 3.11. Recreating..." -ForegroundColor Yellow
+            Remove-Item -Recurse -Force $venvPath
+        }
+    }
+
     # Create venv if it doesn't exist
     if (-not (Test-Path $venvPath)) {
-        Write-Host "Creating virtual environment..."
-        try {
-        $output = & uv venv $venvPath --python 3.11 2>&1
-        }
-
-        catch {
-            #Output of this presents as an error for some reason even
-            # when it executed successfully
-
-        }
+        Write-Host "Creating virtual environment with Python 3.11..."
+        & uv venv $venvPath --python 3.11 2>&1 | ForEach-Object { Write-Host $_ }
     } else {
         Write-Host "Virtual environment already exists."
     }
@@ -223,9 +224,13 @@ function createVenvAndConfig {
     if (Test-Path $requirements1) {
         Write-Host "Installing/updating packages..."
         
-        $output = & uv pip install -r $requirements1 --python $venvPython 2>&1
+        # Use the venv's pip directly - avoids uv environment resolution issues
+        & uv pip install -r $requirements1 --python $venvPath 2>&1 | ForEach-Object { Write-Host $_ }
+        
         if ($LASTEXITCODE -ne 0) {
-            $output | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+            Write-Host "Package installation failed." -ForegroundColor Red
+            Read-Host "Press Enter to exit"
+            exit 1
         }
         
         Write-Host "Package installation complete!" -ForegroundColor Green
@@ -418,7 +423,7 @@ function downloadAddressFile {
     }
    
     # Convert address file to parquet if no parquet file present
-    if (-Not (Test-Path $addressFileParquet) -or ($script:FileIsOutOfDate)) {   
+    if (-Not (Test-Path $addressFileParquet)) {   
         Write-Host "Converting address csv into a parquet file for speed and space optimization" -ForegroundColor Yellow
         
         & $venvPython -u $toParquetPy --input_path $addressFileCSV --output_path $addressFileParquet
