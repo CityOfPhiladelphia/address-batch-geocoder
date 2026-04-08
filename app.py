@@ -116,7 +116,7 @@ def download_config(config):
     st.download_button(
         label="Download config",
         data=yaml.dump(config),
-        file_name="streamlit_config.yml",
+        file_name="geocoder_config.yml",
     )
 
 def update_fields():
@@ -226,7 +226,7 @@ def main():
     
     # --- SRID & Enrichment Fields ---
     srids = st.multiselect(
-        "Choose which SRIDs to append. Required.",
+        "Choose which coordinate system (SRID) to use when geocoding. Required.",
         [4326, 2272],
         key="srids"
     )
@@ -270,6 +270,7 @@ def main():
     )
 
     if ready_to_geocode:
+        st.markdown(":blue[Geocoding large files could take a while. Please do not refresh the page.]")
         if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"]):
             with st.spinner("Geocoding..."):
                 try:
