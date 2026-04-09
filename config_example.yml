@@ -28,4 +28,6 @@ enrichment_fields:
 
 # Which SRIDs to return for geocoding
 srid_4326: true
+shape_4326: false
 srid_2272: true
+shape_2272: false

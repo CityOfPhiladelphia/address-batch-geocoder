@@ -484,7 +484,6 @@ def enrich_with_tomtom(parser, config: dict, to_add: pl.LazyFrame) -> pl.LazyFra
 
     return added
 
-
 @click.command()
 @click.option(
     "--config_path",
@@ -509,6 +508,8 @@ def process_csv(config_path):
     
     srid_4326 = config.get("srid_4326")
     srid_2272 = config.get("srid_2272")
+    shape_4326 = config.get("shape_4326")
+    shape_2272 = config.get("shape_2272")
     
     if not srid_4326 and not srid_2272:
         raise ValueError(
@@ -516,6 +517,13 @@ def process_csv(config_path):
             "Set srid_4326 or srid_2272 to true in your config file."
         )
 
+    if (shape_4326 and not srid_4326) or (shape_2272 and not srid_2272):
+        raise ValueError(
+            "Invalid configuration: Enabled shape must match enabled SRID. \n "
+            "If shape_4326 is True, then srid_4326 must be true. If shape_2272 is True" \
+            ", then srid_2272 must be true."
+        )
+    
     filepath = config.get("input_file")
     geo_filepath = config.get("geography_file") or config.get("address_file")
 
@@ -736,7 +744,22 @@ def process_csv(config_path):
         
         # Drop raw address field, no longer need it after tomtom match
         rejoined = rejoined.select(ordered_cols)
-        
+
+        if shape_4326:
+            rejoined = rejoined.with_columns(
+                pl.struct(["geocode_lat", "geocode_lon"]).map_elements(
+                    lambda x: f"SRID=4326;POINT({x['geocode_lat']} {x['geocode_lon']})", 
+                    return_dtype=pl.String
+                ).alias("shape_4326")
+        )
+        if shape_2272:
+            rejoined = rejoined.with_columns(
+                pl.struct(["geocode_x", "geocode_y"]).map_elements(
+                    lambda x: f"SRID=2272;POINT({x['geocode_x']} {x['geocode_y']})", 
+                    return_dtype=pl.String
+                ).alias("shape_2272")
+        )
+
         # -------------------- Save Output File ---------------------- #
 
         in_path = PurePath(original_filepath)

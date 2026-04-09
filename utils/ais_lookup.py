@@ -8,7 +8,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
-
+cached_responses = {}
 
 def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
     """
@@ -200,8 +200,14 @@ def ais_lookup(
         and user-requested fields.
     """
     AIS_RATE_LIMITER.wait()
+    out_data = {}
 
-    # Don't attempt to geocode if address is null
+    # See if we already processed this address.
+    if address and address.lower() in cached_responses:
+        out_data = cached_responses[address.lower()]        
+        return out_data
+
+    # Don't attempt to geocode if address is null    
     if address:
         try:
             quoted_address = quote(address)
@@ -218,7 +224,6 @@ def ais_lookup(
     elif response and response.status_code == 429:
         raise Exception("429 response. Too many calls to the AIS API.")
 
-    out_data = {}
     # If status code is 200, that means API has found a match.
     # API will return a 404 if no match
     if response and response.status_code == 200:
@@ -268,6 +273,8 @@ def ais_lookup(
 
             for field in enrichment_fields:
                 out_data[field] = None
+            
+            cached_responses[address.lower()] = out_data
 
             return out_data
 
@@ -302,6 +309,8 @@ def ais_lookup(
             for field in enrichment_fields:
                 field_value = tiebroken_address.get("properties", "").get(field, "")
                 out_data[field] = str(field_value) if field_value else None
+
+            cached_responses[address.lower()] = out_data
 
             return out_data
 
