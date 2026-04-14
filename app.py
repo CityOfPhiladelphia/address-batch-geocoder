@@ -114,9 +114,10 @@ def call_geocoder_backend(data, config):
 # Prevent app from rerunning when this is clicked
 @st.fragment
 def download_config(config):
+    config_for_download = {**config, "input_file": None} # Make input file none since streamlit cannot access full filepaths
     st.download_button(
         label="Download config",
-        data=yaml.dump(config),
+        data=yaml.dump(config_for_download),
         file_name="geocoder_config.yml",
     )
 
