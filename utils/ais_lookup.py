@@ -73,8 +73,8 @@ def get_intersection_coords(ais_dict: dict) -> list[str, str]:
     return coords
 
 @retry(
-    wait_exponential_multiplier=1000,
-    wait_exponential_max=10000,
+    wait_exponential_multiplier=2000,
+    wait_exponential_max=20000,
     stop_max_attempt_number=5,
 )
 def make_coordinate_lookups(
