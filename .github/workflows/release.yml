@@ -1,10 +1,6 @@
 name: Build and Release Powershell Executable
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'powershell/*'
     tags:
       - 'v*'
   workflow_dispatch:

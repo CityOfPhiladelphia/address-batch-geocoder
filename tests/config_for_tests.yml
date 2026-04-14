@@ -4,7 +4,7 @@ AIS_API_KEY:
 
 # Input File Config
 input_file: sample_file_input.csv
-geography_file: test_address_file.parquet
+address_file: test_address_file.parquet
 
 full_address_field:
 
