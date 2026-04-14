@@ -97,6 +97,7 @@ def call_geocoder_backend(data, config):
         tmp_path = tmp.name
 
     try:
+        config = {**config, "input_file": tmp_path}
         result, utf8_filepath = process_data(tmp_path, config)
         try:
             df = result.collect()
