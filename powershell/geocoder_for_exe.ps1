@@ -33,7 +33,7 @@ $requirements1 = Join-Path $installFolder   '.\requirements.txt'
 $repoURL = 'https://github.com/CityOfPhiladelphia/address-geocoder.git'
 $owner = "CityOfPhiladelphia"
 $repo = "address-batch-geocoder"
-$branch = "origin/frontend-test"
+$branch = "origin/main"
 
 # Exe version, used to check if we need to force user to update
 $exeVersion = "v2.0.0"
