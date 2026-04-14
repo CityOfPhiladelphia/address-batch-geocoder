@@ -170,6 +170,14 @@ def _fetch_ais_coordinates(
     stop_max_attempt_number=3,
     wait_fixed=200,
 )
+# Code adapted from Alex Waldman and Roland MacDavid
+# https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
+@retry(
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=10000,
+    stop_max_attempt_number=3,
+    wait_fixed=200,
+)
 def ais_lookup(
     sess: requests.Session,
     api_key: str,

@@ -9,7 +9,7 @@ $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 $installFolder      = Join-Path $ScriptDirectory 'address-geocoder-main'
 $dataDirectory      = Join-Path $ScriptDirectory 'geocoder_address_data'
 $powershellDirectory = Join-Path $installFolder 'powershell'
-$versionFile        = Join-Path $powershellDirectory 'release.txt'
+$versionFile        = Join-Path $ScriptDirectory 'release.txt'
 $s3URL              = 'https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz'
 $addressFileGZ      = Join-Path $dataDirectory   'address_service_area_summary.csv.gz'
 $addressFileCSV     = Join-Path $dataDirectory   'address_service_area_summary.csv'
@@ -32,7 +32,11 @@ $requirements1 = Join-Path $installFolder   '.\requirements.txt'
 # GitHub Repo info
 $repoURL = 'https://github.com/CityOfPhiladelphia/address-geocoder.git'
 $owner = "CityOfPhiladelphia"
-$repo = "address-geocoder"
+$repo = "address-batch-geocoder"
+$branch = "origin/frontend-test"
+
+# Exe version, used to check if we need to force user to update
+$exeVersion = "v2.0.0"
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
@@ -54,7 +58,20 @@ function checkToolVersion {
         $response = Invoke-RestMethod -Uri $apiUrl -Headers $headers -TimeoutSec 5 -ErrorAction Stop
         $remoteVersion = $response.tag_name
         
-        if ($localVersion -ne $remoteVersion) {
+        # End process if version is out of date
+        $minExeVersionFile = Join-Path $powershellDirectory 'min_exe_version.txt'
+            if (Test-Path $minExeVersionFile) {
+                $minExeVersion = (Get-Content $minExeVersionFile -Raw).Trim()
+                if ($exeVersion -lt $minExeVersion) {
+                    Write-Host "This version of the tool is no longer supported." -ForegroundColor Red
+                    Write-Host "Please download the latest version from:" -ForegroundColor Yellow
+                    Write-Host "https://github.com/$owner/$repo/releases/latest" -ForegroundColor Cyan
+                    Read-Host "Press Enter to exit"
+                    exit 1
+                }
+            }
+        
+        if ($localVersion -lt $remoteVersion) {
             $border = "=" * 70
             Write-Host ""
             Write-Host $border -ForegroundColor Yellow
@@ -111,21 +128,21 @@ function installGit {
 }
 
 function installPython {
-    Write-Host "Checking for Python 3.10 on this machine..."
+    Write-Host "Checking for Python 3.11 on this machine..."
 
-    & py -3.10 --version > $null 2>&1
+    & py -3.11 --version > $null 2>&1
     if ($LASTEXITCODE -eq 0) {
-        $ver = py -3.10 --version
-        Write-Host "Python 3.10 is already available: $ver"
+        $ver = py -3.11 --version
+        Write-Host "Python 3.11 is already available: $ver"
         return
     }
 
-    Write-Host "Python 3.10 not found. Attempting installation via winget (source 'winget')..."
+    Write-Host "Python 3.11 not found. Attempting installation via winget (source 'winget')..."
 
     $wingetArgs = @(
         "install",
         "-e",
-        "--id","Python.Python.3.10",
+        "--id","Python.Python.3.11",
         "--source","winget",
         "--accept-source-agreements",
         "--accept-package-agreements"
@@ -133,8 +150,8 @@ function installPython {
 
     & winget @wingetArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget failed to install Python 3.10 (exit code $LASTEXITCODE)." -ForegroundColor Red
-        Write-Host "You may need to install Python 3.10 manually from python.org, then re-run this script." -ForegroundColor Yellow
+        Write-Host "winget failed to install Python 3.11 (exit code $LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "You may need to install Python 3.11 manually from python.org, then re-run this script." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         exit 1
     }
@@ -142,16 +159,16 @@ function installPython {
     # Refresh path after Python install
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
-    & py -3.10 --version > $null 2>&1
+    & py -3.11 --version > $null 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget reported success, but 'py -3.10' is still not available." -ForegroundColor Red
-        Write-Host "Please install Python 3.10 manually, ensure 'py -3.10' works, then re-run this script." -ForegroundColor Yellow
+        Write-Host "winget reported success, but 'py -3.11' is still not available." -ForegroundColor Red
+        Write-Host "Please install Python 3.11 manually, ensure 'py -3.11' works, then re-run this script." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         exit 1
     }
 
-    $ver2 = py -3.10 --version
-    Write-Host "Python 3.10 installation complete: $ver2"
+    $ver2 = py -3.11 --version
+    Write-Host "Python 3.11 installation complete: $ver2"
 }
 
 function installUv {
@@ -187,18 +204,19 @@ function installUv {
 function createVenvAndConfig {
     Write-Host "Setting up virtual environment and packages..."
     
+    # Check if existing venv uses the wrong Python version and nuke it
+    if (Test-Path $venvPython) {
+        $venvVersion = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
+        if ($venvVersion -ne "3.11") {
+            Write-Host "Virtual environment is Python $venvVersion, expected 3.11. Recreating..." -ForegroundColor Yellow
+            Remove-Item -Recurse -Force $venvPath
+        }
+    }
+
     # Create venv if it doesn't exist
     if (-not (Test-Path $venvPath)) {
-        Write-Host "Creating virtual environment..."
-        try {
-        $output = & uv venv $venvPath --python 3.10 2>&1
-        }
-
-        catch {
-            #Output of this presents as an error for some reason even
-            # when it executed successfully
-
-        }
+        Write-Host "Creating virtual environment with Python 3.11..."
+        & uv venv $venvPath --python 3.11 2>&1 | ForEach-Object { Write-Host $_ }
     } else {
         Write-Host "Virtual environment already exists."
     }
@@ -206,9 +224,13 @@ function createVenvAndConfig {
     if (Test-Path $requirements1) {
         Write-Host "Installing/updating packages..."
         
-        $output = & uv pip install -r $requirements1 --python $venvPython 2>&1
+        # Use the venv's pip directly - avoids uv environment resolution issues
+        & uv pip install -r $requirements1 --python $venvPath 2>&1 | ForEach-Object { Write-Host $_ }
+        
         if ($LASTEXITCODE -ne 0) {
-            $output | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+            Write-Host "Package installation failed." -ForegroundColor Red
+            Read-Host "Press Enter to exit"
+            exit 1
         }
         
         Write-Host "Package installation complete!" -ForegroundColor Green
@@ -231,33 +253,31 @@ function cloneOrUpdate {
         Push-Location $installFolder
         
         try {
-            $null = git fetch origin 2>&1
+            git fetch origin 2>&1 | ForEach-Object { Write-Host $_}
+
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Failed to fetch updates." -ForegroundColor Red
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
             
             $localCommit = git rev-parse HEAD
-            $remoteCommit = git rev-parse "origin/main"
+            $remoteCommit = git rev-parse $branch
             
             if ($localCommit -ne $remoteCommit) {
                 Write-Host "Updates available. Pulling changes..."
                 
-                $status = git status --porcelain
-                if ($status) {
-                    Write-Host "Local changes detected. Stashing..."
-                    $null = git stash push -m "Auto-stash before update" 2>&1
-                    $stashed = $true
-                } else {
-                    $stashed = $false
-                }
-                
-                $null = git pull origin "main" 2>&1
-                
-                # Restore stashed changes if we stashed them
-                if ($stashed) {
-                    Write-Host "Restoring local changes..."
-                    $null = git stash pop 2>&1
+                # Reset any local changes, they should always match remote
+                git reset --hard $branch | ForEach-Object { Write-Host $_ }
+
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "Failed to pull updates." -ForegroundColor Red
+                    Read-Host "Press Enter to exit"
+                    exit 1
                 }
                 
                 Write-Host "Repository updated successfully!" -ForegroundColor Green
-                
                 $script:RepoWasUpdated = $true
             } else {
                 Write-Host "Repository is up to date."
@@ -266,16 +286,25 @@ function cloneOrUpdate {
         }
         catch {
             Write-Host "Failed to update repository: $_" -ForegroundColor Red
-            Pop-Location
+            Read-Host "Press Enter to exit"
             exit 1
         }
-        
-        Pop-Location
+
+        finally {
+            Pop-Location
+        }
+
     } else {
         Write-Host "Repository not found. Cloning..."
         
         try {
-            $null = git clone $repoURL $installFolder 2>&1
+            git clone $repoURL $installFolder 2>&1 | ForEach-Object { Write-Host $_ }
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Failed to clone repository." -ForegroundColor Red
+                Read-Host "Press Enter to exit"
+                exit 1
+            }
             
             Write-Host "Repository cloned successfully!" -ForegroundColor Green
             
@@ -283,6 +312,8 @@ function cloneOrUpdate {
         }
         catch {
             Write-Host "Failed to clone repository: $_" -ForegroundColor Red
+            Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
+            Read-Host "Press Enter to exit"
             exit 1
         }
     }
@@ -381,6 +412,7 @@ function downloadAddressFile {
         if (Test-Path $addressFileCSV) {
             Remove-Item $addressFileCSV -Force
         }
+        Read-Host "Press Enter to exit"
         exit 1
     }
 
@@ -448,9 +480,38 @@ if ($script:RepoWasJustCloned) {
 }
 
 # Always run the geocoder if not first-time setup
-Write-Host "`nRunning geocoder..." -ForegroundColor Green
+[string]$runOption = Read-Host -Prompt "Choose an option:`n[1] Run with the user-interface`n[2] Run with the .yml config`n[Any other key]: exit`n"
 
-try {
+switch ($runOption) {
+    '1' {
+       try {
+
+    $appPy = Join-Path $installFolder 'app.py'  # adjust to your actual entrypoint
+    $process = Start-Process -FilePath $venvPython `
+                            -ArgumentList "-m", "streamlit", "run", $appPy `
+                            -WorkingDirectory $ScriptDirectory `
+                            -NoNewWindow `
+                            -Wait `
+                            -PassThru
+
+    if ($process.ExitCode -ne 0) {
+        throw "Streamlit exited with code $($process.ExitCode)"
+    }
+}
+catch {
+    Write-Host "`n========== ERROR ==========" -ForegroundColor Red
+    Write-Host "An error occurred while running the geocoder:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Yellow
+    Write-Host "============================" -ForegroundColor Red
+}
+finally {
+    Write-Host "`nProcess complete. Press any key to close..."
+    [void][System.Console]::ReadKey($true)
+} 
+    }
+
+    '2' {
+        try {
     # Use Start-Process to allow interactive prompts
     $process = Start-Process -FilePath $venvPython `
                              -ArgumentList $geocoderPy `
@@ -472,4 +533,6 @@ catch {
 finally {
     Write-Host "`nProcess complete. Press any key to close..."
     [void][System.Console]::ReadKey($true)
+}
+    }
 }

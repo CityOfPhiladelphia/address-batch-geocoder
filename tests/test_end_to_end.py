@@ -3,7 +3,7 @@ import shutil
 import polars as pl
 import os
 from click.testing import CliRunner
-from geocoder import process_csv
+from geocoder import run_process_csv
 from pathlib import Path
 
 TEST_DIR = Path(__file__).parent
@@ -23,7 +23,7 @@ def geocoded_output(tmp_path_factory):
         config = yaml.safe_load(f)
     
     config["input_file"] = str(input_path)
-    config["geography_file"] = str(TEST_DIR / "test_address_file.parquet")
+    config["address_file"] = str(TEST_DIR / "test_address_file.parquet")
 
     if os.getenv("AIS_API_KEY"):
         config["AIS_API_KEY"] = os.getenv("AIS_API_KEY")
@@ -33,7 +33,7 @@ def geocoded_output(tmp_path_factory):
         yaml.dump(config, f)
 
     runner = CliRunner()
-    result = runner.invoke(process_csv, ["--config_path", str(temp_config)])
+    result = runner.invoke(run_process_csv, ["--config_path", str(temp_config)])
 
     assert result.exit_code == 0, result.output
 
