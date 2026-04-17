@@ -2,10 +2,10 @@ import requests
 from retrying import retry
 from .rate_limiter import RateLimiter
 from urllib.parse import quote
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+import urllib3
 
 # Suppress the InsecureRequestWarning
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 

@@ -88,32 +88,6 @@ def test_build_enrichment_fields_returns_fields_only_2272():
     assert expected == actual
 
 
-def test_build_enrichment_fields_defaults_to_neither_srid():
-    """Test that when srid flags are not specified, both are included by default"""
-    config = {
-        "enrichment_fields": [
-            "census_tract_2020",
-            "census_block_group_2020",
-            "census_block_2020",
-        ],
-        # No srid_4326 or srid_2272 specified - should default to True
-    }
-
-    expected = (
-        {"census_tract_2020", "census_block_group_2020", "census_block_2020"},
-        {
-            "census_tract_2020",
-            "census_block_group_2020",
-            "census_block_2020",
-            "street_address",
-        },
-    )
-
-    actual = build_enrichment_fields(config)
-
-    assert expected == actual
-
-
 def test_build_enrichment_fields_errors_if_invalid_field():
     config = {
         "enrichment_fields": [

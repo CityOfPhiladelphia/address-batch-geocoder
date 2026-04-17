@@ -6,6 +6,8 @@ AIS_API_KEY:
 input_file:
 address_file: ./geocoder_address_data/address_service_area_summary.parquet
 
+resume: False
+
 full_address_field:
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
