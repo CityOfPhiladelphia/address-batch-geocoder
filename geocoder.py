@@ -209,19 +209,13 @@ class Geocoder:
             raise ValueError(
                 "AIS API Key must be specified."
             )
-    
-        if not self.srid_4326 and not self.srid_2272:
-            raise ValueError(
-                "Invalid configuration: At least one SRID must be enabled. "
-                "Set srid_4326 or srid_2272 to true in your config file."
-            )
-
+        
         if not self.input_filepath:
             raise ValueError("An input filepath must be specified in the config file.")
         
         if not self.geo_filepath:
             raise ValueError("A filepath for the address_file must be specified in the config.")
-
+        
         self.parser: PassyunkParser = PassyunkParser()
         self.session: requests.Session = requests.Session()
 
@@ -232,14 +226,21 @@ class Geocoder:
         in_path = PurePath(self.input_filepath)
         stem = in_path.name.replace("".join(in_path.suffixes), "") 
 
-        self.out_path = str(in_path.parent / f"{stem}_enriched.csv")    
+        self.out_path = str(in_path.parent / f"{stem}_enriched.csv")
+
+        if self.config.get("resume"):
+            prev_config = self._infer_previous_config()
+            self.__dict__.update(prev_config)  
+
+
+        if not self.srid_4326 and not self.srid_2272:
+            raise ValueError(
+                "Invalid configuration: At least one SRID must be enabled. "
+                "Set srid_4326 or srid_2272 to true in your config file."
+            )
         
         # Determine which fields to append to the output
-        # If resuming, get them from the partially geocoded file
-        if self.config.get("resume"):
-             prev_config = self._infer_previous_config()
-             self.__dict__.update(prev_config)
-             
+        # If resuming, get them from the partially geocoded file             
         self.ais_enrichment_fields, \
         self.address_file_enrichment_fields \
               = build_enrichment_fields(
