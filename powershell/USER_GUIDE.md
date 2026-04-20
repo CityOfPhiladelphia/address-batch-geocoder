@@ -36,13 +36,15 @@ First, you will need to download and install the geocoder.
 
 The geocoder file can be downloaded from GitHub. The latest release can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/
 
-Read through the notes carefully, and then download the zip file at the bottom of the readme.
+Read through the notes carefully, and then download the zip file at the bottom of the readme. You may get a dangerous file blocked warning from Chrome. Override this block and download anyway.
 
 Extract the zip folder into a folder where you can easily find it. When opening the zipped file, you may be prompted to either `extract` or `run`. Hit `extract`, not `run`, as the script will need to exist in an uncompressed directory in order to create the subfolders needed to work.
 
 The folder **must not** have spaces in its name. The zip folder contains two files: `geocoder.exe` and `release.txt`. If you delete or rename these files, you will need to download them again or rename them back. Deleting `release.txt` will stop the program from being able to inform you if there is a new version of the `.exe` file that you need to download.
 
-Double-clicking `geocoder.exe` will launch the program. As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
+Double-clicking `geocoder.exe` will launch the program. You may see a popup that says "Windows protected your PC." This file is safe, so bypass this protection by clicking `More info,` and then selecting `Run anyway`.
+
+As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
 
 Note that this script will attempt to install Python 3.11 on your machine if you do not have Python 3.11 installed on your machine.
 
@@ -116,7 +118,13 @@ AIS_API_KEY:
 input_file: ./data/example_input_4.csv
 address_file: ./geocoder_address_data/address_service_area_summary.parquet
 ```
-4. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
+4. The geocoder writes data incrementally. If your previous geocoding session was interrupted before it finished, you have the option to resume that file. In that case, you will set:
+```
+resume: True
+```
+You will still need to provide the name of the non-geocoded input file as the input file. The partially geocoded file must exist in the same directory as the
+input file, with the format {input_file_name}_enriched.csv.
+5. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
 
 Example, for a csv with the following fields:
 `addr_st, addr_city, addr_zip`
@@ -127,7 +135,7 @@ input_file: 'example.csv'
 full_address_field:
 
 address_fields:
-  street: addr_st
+  street_address: addr_st
   city: addr_city
   state:
   zip: addr_zip
@@ -135,7 +143,7 @@ address_fields:
 ```
 If you have both full_address_field and the address fields filled in, the script will ask you which to use.
 
-5. List which fields other than latitude and longitude you want to add.
+6. List which fields other than latitude and longitude you want to add.
   (Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
   A complete list of valid fields can be found further down in this README. 
 
@@ -145,7 +153,7 @@ enrichment_fields:
   - census_block_group_2020
   - census_block_2020
 ```
-6. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
+7. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
 
 ```
 # Which SRIDs to return for geocoding
@@ -162,11 +170,13 @@ AIS_API_KEY: YOUR_API_KEY
 input_file: ./data/example_input_4.csv
 address_file: ./data/addresses.parquet
 
+resume: False
+
 full_address_field: address
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
-  street:
+  street_address:
   city:
   state:
   zip:
@@ -178,7 +188,7 @@ enrichment_fields:
   - census_block_2020
 ```
 
-7. You're now ready to run the geocoder.
+8. You're now ready to run the geocoder.
 
 Double-click `geocoder.exe` -- the same file that you used to instal geocoder.
 
@@ -274,6 +284,9 @@ Once the file is configured, run:
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
+|`opa_account_num`|
+|`opa_address`|
+|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
@@ -441,4 +454,3 @@ flowchart TB
     style N fill:#FFF9C4
 
 ```
-

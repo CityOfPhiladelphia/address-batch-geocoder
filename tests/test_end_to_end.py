@@ -3,8 +3,9 @@ import shutil
 import polars as pl
 import os
 from click.testing import CliRunner
-from geocoder import run_process_csv
+from geocoder import run_process_csv, Geocoder
 from pathlib import Path
+from unittest.mock import patch
 
 TEST_DIR = Path(__file__).parent
 TEST_CSV = TEST_DIR / "sample_file_input.csv"
@@ -39,6 +40,58 @@ def geocoded_output(tmp_path_factory):
     output_path = tmp / (TEST_CSV.stem + "_enriched.csv")
 
     return pl.read_csv(output_path)
+
+@pytest.fixture()
+def geocoded_output_resumed(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("geocoder")
+
+    input_path = tmp / TEST_CSV.name
+    shutil.copy(TEST_CSV, input_path)
+
+    with open(CONFIG_FILE_PATH) as f:
+        config = yaml.safe_load(f)
+    
+    config["input_file"] = str(input_path)
+    config["address_file"] = str(TEST_DIR / "test_address_file.parquet")
+
+    config["AIS_API_KEY"] = os.getenv("AIS_API_KEY", "test_dummy_key")
+    
+    temp_config = tmp / "config_for_tests.yml"
+    with open(temp_config, "w") as f:
+        yaml.dump(config, f)
+    
+
+    # Phase 1: partial run
+    gc = Geocoder(config)
+    gc.batch_size = 1
+
+    original_write_batch = gc._write_batch
+    call_count = 0
+
+    def write_then_crash(batch, out_path):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise Exception("Simulated crash")
+        return original_write_batch(batch, out_path)
+
+    with patch.object(gc, '_write_batch', side_effect=write_then_crash):
+
+        try:
+            gc.geocode()
+
+        except Exception:
+            pass
+    
+    # Phase 2: resume
+    config["resume"] = True
+    gc2 = Geocoder(config)
+    gc2.geocode()
+
+    output_path = tmp / (TEST_CSV.stem + "_enriched.csv")
+
+    return pl.read_csv(output_path)
+
 
 def test_output_has_correct_row_count(geocoded_output):
     assert len(geocoded_output) == 9
@@ -91,6 +144,14 @@ def test_api_address_has_right_coordinates(geocoded_output):
     assert row["geocode_lon"].item() == pytest.approx(-75.13838509, rel=1e-3)
     assert row["geocode_x"].item() == pytest.approx(2699567.12316782, rel=1e-3)
     assert row["geocode_y"].item() == pytest.approx(270461.85786862, rel=1e-3)
+
+
+class Test_Resume:
+    def test_resumed_output_right_length(self, geocoded_output_resumed):
+        assert len(geocoded_output_resumed) == 9
+    
+    def test_resumed_output_equals_full_output(self, geocoded_output, geocoded_output_resumed):
+        assert(geocoded_output.equals(geocoded_output_resumed))
 
 @pytest.mark.skipif(
     os.getenv("AIS_API_KEY") is None, 

@@ -4,7 +4,8 @@ import requests
 import click
 import os
 import tempfile
-import csv 
+import csv
+import warnings
 from collections.abc import Generator
 from datetime import datetime
 from functools import partial
@@ -69,18 +70,19 @@ def parse_with_passyunk_parser(
     return lf
 
 
-def build_enrichment_fields(config: dict) -> tuple[list, list]:
+def build_enrichment_fields(ais_enrichment_fields: list, srid_4326: bool, srid_2272: bool) -> tuple[list, list]:
     """
     Given a config dictionary, returns two lists of fields to be
     added to the input file. One list is the address file fieldnames,
     the other is the AIS fieldnames.
 
     Args:
-        config (dict): A dictionary read from the config yaml file
+        ais_enrichment_fields (list): A list of fields to append
+        srid_4326 (bool): Whether or not to append SRID 4326
+        srid_2272 (bool): Whether or not to append SRID 2272 
 
     Returns: A tuple with AIS fieldnames and address file fieldnames.
     """
-    ais_enrichment_fields = config.get("enrichment_fields")
     address_file_fields = []
 
     # Only append enrichment fields if set to avoid NoneType Error
@@ -104,21 +106,17 @@ def build_enrichment_fields(config: dict) -> tuple[list, list]:
     # Need street_address for joining
     address_file_fields.append("street_address")
 
-    # Add coordinate fields based on config
-    srid_4326 = config.get("srid_4326")
-    srid_2272 = config.get("srid_2272")
-
     if srid_4326:
         address_file_fields.extend(["geocode_lat", "geocode_lon"])
     if srid_2272:
         address_file_fields.extend(["geocode_x", "geocode_y"])
 
     # Avoid issues if user specifies a field more than once
-    # Return empty set if no enrichment fields set
-    return (set(ais_enrichment_fields) if ais_enrichment_fields else set(), set(address_file_fields))
+    # Return empty   if no enrichment fields set
+    return (ais_enrichment_fields if ais_enrichment_fields else [], address_file_fields)
 
 def add_address_file_fields(
-    geo_filepath: str, input_data: pl.LazyFrame, address_fields: list, config: dict
+    geo_filepath: str, input_data: pl.LazyFrame, address_fields: list, srid_4326: bool, srid_2272: bool
 ) -> tuple[pl.LazyFrame, dict]:
     """
     Given a list of address fields to add, adds those fields from
@@ -130,6 +128,8 @@ def add_address_file_fields(
         file used to geocode addresses.
         input_data: A lazyframe containing the input data to be enriched
         address_fields: A list of one or more address fields
+        srid_4326: Whether or not to append SRID 4326
+        srid_2272: Whether or not to append SRID 2272
     
         Returns:
             The appended data and a dict of renamed fields if there were fieldname conflicts
@@ -162,10 +162,7 @@ def add_address_file_fields(
     ).rename(rename_mapping)
 
     # Mark match type as address_file if we got coordinates from the file
-    # Check whichever SRID is enabled
-    srid_4326 = config.get("srid_4326")
-    srid_2272 = config.get("srid_2272")
-    
+    # Check whichever SRID is enabled    
     if srid_4326:
         match_condition = pl.col("geocode_lat").is_not_null()
     elif srid_2272:
@@ -207,6 +204,7 @@ class Geocoder:
         ## Due to a name change, config file may have older format 'geography_file' name or newer format: 'address_file' field
         self.geo_filepath = config.get("geography_file") or config.get("address_file")
 
+        # Raise errors if config file malformed
         if not self.api_key:
             raise ValueError(
                 "AIS API Key must be specified."
@@ -237,9 +235,18 @@ class Geocoder:
         self.out_path = str(in_path.parent / f"{stem}_enriched.csv")    
         
         # Determine which fields to append to the output
+        # If resuming, get them from the partially geocoded file
+        if self.config.get("resume"):
+             prev_config = self._infer_previous_config()
+             self.__dict__.update(prev_config)
+             
         self.ais_enrichment_fields, \
         self.address_file_enrichment_fields \
-              = build_enrichment_fields(config)
+              = build_enrichment_fields(
+                  config.get("enrichment_fields", []),
+                  srid_4326=self.srid_4326,
+                  srid_2272=self.srid_2272
+              )
         
         # Programmatically calculate lines in file
         with open(self.input_filepath, "r") as f:
@@ -248,7 +255,48 @@ class Geocoder:
         # Programmatically set batch size based on length of input file
         # To avoid writing too frequently for large files
         self.batch_size = max(1000, self.row_count // 100)
+    
+    # ------------ Functions Needed for Resume Functionality -------------- #
+    def _count_output_rows(self) -> int:
+        """Determines how many rows are in the output file. Needed to know
+        when to resume geocoding."""
+        if not os.path.exists(self.out_path):
+            return 0
+        with open(self.out_path, 'r', encoding='utf-8-sig') as f:
+            return sum(1 for _ in f) - 1 # minus header
+    
+    def _infer_previous_config(self) -> None:
+        """Determines the previous config for a partially geocoded file. Needed in order to determine
+        what geode format and enrichment fields should be used. Overwrites existing geocode format and address field specifications."""
+
+        prev_config = {}
+        if not os.path.exists(self.out_path):
+            raise FileNotFoundError(f"""No partially coded file found. 
+                                    In order to resume geocoding {self.input_filepath}, 
+                                    the following file must exist: {self.out_path}""")
+
+        with open(self.out_path, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            header = reader.fieldnames
         
+        # Determine geocode fields:
+        if 'geocode_lat' in header and 'geocode_lon' in header:
+            prev_config['srid_4326'] = True
+        else:
+            prev_config['srid_4326'] = False
+        
+        if 'geocode_x' in header and 'geocode_y' in header:
+            prev_config['srid_2272'] = True
+        else:
+            prev_config['srid_2272'] = False
+        
+        if not (prev_config.get("srid_4326") or prev_config.get("srid_2272")):
+            raise ValueError("Partially coded file is missing geocoded fields, and cannot be resumed.")
+
+        # Identify enrichment fields
+        prev_config["address_file_enrichment_fields"] = [key for key in header if key in POSSIBLE_FIELDS.keys()]
+
+        return prev_config
 
     def _read_from_tmp(self, tmp_path: str) -> Generator[dict, None, None]:
         """Reads the sunk temp file after address file join 
@@ -258,7 +306,7 @@ class Geocoder:
         bool_fields = {"is_undefined", "is_non_philly", 
                        "is_addr", "is_philly_addr"}
         
-        with open(tmp_path, mode='r', encoding='utf-8') as f:
+        with open(tmp_path, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
 
@@ -275,7 +323,8 @@ class Geocoder:
         write_header = not os.path.exists(out_path)
 
         with open(out_path, 'a', newline='', encoding='utf-8-sig') as f:
-            writer = csv.DictWriter(f, fieldnames=batch[0].keys())
+            fieldnames = [key for key in batch[0].keys() if key != '__geocode_idx__']
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
 
             if write_header:
                 writer.writeheader()
@@ -457,7 +506,8 @@ class Geocoder:
         philly_joined_lf, input_renames = add_address_file_fields(
             self.geo_filepath, philly_lf, 
             self.address_file_enrichment_fields, 
-            self.config
+            self.srid_4326,
+            self.srid_2272
             )
 
         # If we renamed any columns on philly_joined_lf, we need to do
@@ -622,6 +672,12 @@ class Geocoder:
         if not self.config.get("resume"):
             if os.path.exists(self.out_path):
                 os.remove(self.out_path)
+        
+        # Get where we need to start writing
+        # On resume, skip rows already written to output
+        # Iterating and discarding is cheap since no API calls are made
+        resume_offset = self._count_output_rows() \
+            if self.config.get("resume") else 0
 
         try:
             # Step 1: Join to the address file, then sink the results
@@ -633,7 +689,10 @@ class Geocoder:
 
             records = self._read_from_tmp(sink_path)
 
-            for record in records:
+            for idx, record in enumerate(records):
+                if idx < resume_offset:
+                    continue
+
                 if self._is_matched(record):
                     batch.append(self._to_output_record(record))
                 

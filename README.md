@@ -118,7 +118,13 @@ AIS_API_KEY:
 input_file: ./data/example_input_4.csv
 address_file: ./geocoder_address_data/address_service_area_summary.parquet
 ```
-4. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
+4. The geocoder writes data incrementally. If your previous geocoding session was interrupted before it finished, you have the option to resume that file. In that case, you will set:
+```
+resume: True
+```
+You will still need to provide the name of the non-geocoded input file as the input file. The partially geocoded file must exist in the same directory as the
+input file, with the format {input_file_name}_enriched.csv.
+5. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
 
 Example, for a csv with the following fields:
 `addr_st, addr_city, addr_zip`
@@ -137,7 +143,7 @@ address_fields:
 ```
 If you have both full_address_field and the address fields filled in, the script will ask you which to use.
 
-5. List which fields other than latitude and longitude you want to add.
+6. List which fields other than latitude and longitude you want to add.
   (Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
   A complete list of valid fields can be found further down in this README. 
 
@@ -147,7 +153,7 @@ enrichment_fields:
   - census_block_group_2020
   - census_block_2020
 ```
-6. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
+7. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
 
 ```
 # Which SRIDs to return for geocoding
@@ -163,6 +169,8 @@ AIS_API_KEY: YOUR_API_KEY
 # File Config
 input_file: ./data/example_input_4.csv
 address_file: ./data/addresses.parquet
+
+resume: False
 
 full_address_field: address
 
@@ -180,7 +188,7 @@ enrichment_fields:
   - census_block_2020
 ```
 
-7. You're now ready to run the geocoder.
+8. You're now ready to run the geocoder.
 
 Double-click `geocoder.exe` -- the same file that you used to instal geocoder.
 

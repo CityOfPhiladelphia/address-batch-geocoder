@@ -6,6 +6,8 @@ AIS_API_KEY:
 input_file:
 address_file: ./geocoder_address_data/address_service_area_summary.parquet
 
+# If this file has been partially geocoded and you want to resume
+# set this to true
 resume: False
 
 full_address_field:

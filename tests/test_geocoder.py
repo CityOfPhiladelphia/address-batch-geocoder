@@ -14,8 +14,8 @@ def test_build_enrichment_fields_returns_fields_both_srids():
     }
 
     expected = (
-        {"census_tract_2020", "census_block_group_2020", "census_block_2020"},
-        {
+        ["census_tract_2020", "census_block_group_2020", "census_block_2020"],
+        [
             "census_tract_2020",
             "census_block_group_2020",
             "census_block_2020",
@@ -24,10 +24,10 @@ def test_build_enrichment_fields_returns_fields_both_srids():
             "geocode_lon",
             "geocode_x",
             "geocode_y"
-        },
+        ],
     )
 
-    actual = build_enrichment_fields(config)
+    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
 
     assert expected == actual
 
@@ -44,18 +44,18 @@ def test_build_enrichment_fields_returns_fields_only_4326():
     }
 
     expected = (
-        {"census_tract_2020", "census_block_group_2020", "census_block_2020"},
-        {
+        ["census_tract_2020", "census_block_group_2020", "census_block_2020"],
+        [
             "census_tract_2020",
             "census_block_group_2020",
             "census_block_2020",
             "street_address",
             "geocode_lat",
             "geocode_lon",
-        },
+        ],
     )
 
-    actual = build_enrichment_fields(config)
+    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
 
     assert expected == actual
 
@@ -72,18 +72,18 @@ def test_build_enrichment_fields_returns_fields_only_2272():
     }
 
     expected = (
-        {"census_tract_2020", "census_block_group_2020", "census_block_2020"},
-        {
+        ["census_tract_2020", "census_block_group_2020", "census_block_2020"],
+        [
             "census_tract_2020",
             "census_block_group_2020",
             "census_block_2020",
             "street_address",
             "geocode_x",
             "geocode_y",
-        },
+        ],
     )
 
-    actual = build_enrichment_fields(config)
+    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
 
     assert expected == actual
 
@@ -101,4 +101,4 @@ def test_build_enrichment_fields_errors_if_invalid_field():
     }
 
     with pytest.raises(ValueError):
-        build_enrichment_fields(config)
+        build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
