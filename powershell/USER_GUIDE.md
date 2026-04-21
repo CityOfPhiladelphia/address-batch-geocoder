@@ -18,10 +18,6 @@ fields that the user supplies.
 
 The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
-## Note:
-
-For more information about the geocoder, consult the GitHub repository: https://github.com/CityOfPhiladelphia/address-geocoder. The README in this repo contains more details about the matching process, and information about how to run the geocoder from the command line, if desired.
-
 ## Questions?
 If you have questions about the geocoder that this FAQ cannot answer, feel free to contact citygeo at: maps@phila.gov
 
