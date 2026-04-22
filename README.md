@@ -18,10 +18,6 @@ fields that the user supplies.
 
 The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
-## Note:
-
-For more information about the geocoder, consult the GitHub repository: https://github.com/CityOfPhiladelphia/address-geocoder. The README in this repo contains more details about the matching process, and information about how to run the geocoder from the command line, if desired.
-
 ## Questions?
 If you have questions about the geocoder that this FAQ cannot answer, feel free to contact citygeo at: maps@phila.gov
 
@@ -206,43 +202,35 @@ So, it is important to provide an input file with as clean as an address field a
 
 ### 2.3 Running a Python Command
 
-Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet.
+Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet. If you choose to run the program this way, you should periodically repeat steps 3-5 below to keep the address file up to date.
 
-Navigate to the project's directory and create a virtual environment:
+Package management is handled using uv, instead of pip. You can read more about uv here: https://docs.astral.sh/uv/
 
+#### Installing uv:
+Follow the instructions for your machine for installing uv here, if you have not installed it already: https://docs.astral.sh/uv/getting-started/installation/
+
+#### Installing dependencies:
+1. Navigate to the package directory if not already there: `cd address-batch-geocoder`
+2. run `uv sync` to install the proper Python version and all package dependencies. This will create a virtual environment at `.venv`:
+3. Next, you will need to download the address file. This can be accessed via a public s3 bucket. It's best if you save this to a subfolder titled `address_geocoder_data`:
 ```
-python -m venv .venv
+mkdir address_geocoder_data
+curl -L -O --output-dir ./address_geocoder_data/ "https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz"
 ```
-
-Then, activate the virtual environment. This will need to be activated every time you want to run the enrichment tool, not just this once:
-
+4. Unzip the file:
 ```
-source .venv/bin/activate
+gunzip address_geocoder_data/address_service_area_summary_public.csv.gz
 ```
-
-Finally, install the packages in requirements.text:
-
+5. The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
 ```
-pip install -r requirements.txt
+uv run csv_to_parquet.py --input_path=address_geocoder_data/address_service_area_summary_public.csv --output_path=address_geocoder_data/address_service_area_summary_public.parquet
 ```
-
-Next, you will need to download the address file. This can be accessed via a public s3 bucket:
-
-```
-https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz
-```
-
-The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
-
-```python
-python csv_to_parquet.py --input_path [INPUT_PATH] --output_path [OUTPUT_PATH]
-```
-
-You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
-
+6. You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
 Once the file is configured, run:
-
-```python geocoder.py```
+```
+uv run geocoder.py --config_path=[PATH_TO_YOUR_CONFIG_FILE]
+```
+running ```uv run geocoder.py``` without the ```--config_path``` argument will default to ```config.yml```
 
 ## 3. Enrichment Fields
 
