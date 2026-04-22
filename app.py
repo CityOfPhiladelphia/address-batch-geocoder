@@ -306,7 +306,10 @@ def main():
                     status.update(label="Geocoding failed", state="error")
                 finally:
                     st.session_state["running"] = False
-                    st.session_state["geocode_result"] = True
+
+                    # Only show success message if there wasn't an error
+                    if not st.session_state.get("geocode_error"):
+                        st.session_state["geocode_result"] = True
             
             st.rerun()
         

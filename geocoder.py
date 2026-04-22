@@ -240,14 +240,17 @@ class Geocoder:
             )
         
         # Determine which fields to append to the output
-        # If resuming, get them from the partially geocoded file             
-        self.ais_enrichment_fields, \
-        self.address_file_enrichment_fields \
-              = build_enrichment_fields(
-                  config.get("enrichment_fields", []),
-                  srid_4326=self.srid_4326,
-                  srid_2272=self.srid_2272
-              )
+        # If resuming, get them from the partially geocoded file  
+        # If we're resuming, don't run so we don't override
+        # the enrichment field values
+        if not self.config.get("resume"):           
+            self.ais_enrichment_fields, \
+            self.address_file_enrichment_fields \
+                = build_enrichment_fields(
+                    config.get("enrichment_fields", []),
+                    srid_4326=self.srid_4326,
+                    srid_2272=self.srid_2272
+                )
         
         # Programmatically calculate lines in file
         with open(self.input_filepath, "r") as f:
@@ -295,7 +298,13 @@ class Geocoder:
             raise ValueError("Partially coded file is missing geocoded fields, and cannot be resumed.")
 
         # Identify enrichment fields
-        prev_config["address_file_enrichment_fields"] = [key for key in header if key in POSSIBLE_FIELDS.keys()]
+        prev_config["ais_enrichment_fields"], \
+        prev_config["address_file_enrichment_fields"] = \
+        build_enrichment_fields(
+            [key for key in header if key in POSSIBLE_FIELDS.keys()],
+            prev_config['srid_4326'],
+            prev_config['srid_2272']
+        )
 
         return prev_config
 
