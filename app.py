@@ -135,7 +135,6 @@ def main():
     if st.button("Load file", type="primary"):
         if not os.path.exists(input_filepath):
             st.error(f"File not found: {input_filepath}")
-            st.stop()
             
         st.session_state["loaded_filepath"] = input_filepath
         st.session_state["geocode_result"] = None
