@@ -32,13 +32,15 @@ First, you will need to download and install the geocoder.
 
 The geocoder file can be downloaded from GitHub. The latest release can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/
 
-Read through the notes carefully, and then download the zip file at the bottom of the readme.
+Read through the notes carefully, and then download the zip file at the bottom of the readme. You may get a dangerous file blocked warning from Chrome. Override this block and download anyway.
 
 Extract the zip folder into a folder where you can easily find it. When opening the zipped file, you may be prompted to either `extract` or `run`. Hit `extract`, not `run`, as the script will need to exist in an uncompressed directory in order to create the subfolders needed to work.
 
 The folder **must not** have spaces in its name. The zip folder contains two files: `geocoder.exe` and `release.txt`. If you delete or rename these files, you will need to download them again or rename them back. Deleting `release.txt` will stop the program from being able to inform you if there is a new version of the `.exe` file that you need to download.
 
-Double-clicking `geocoder.exe` will launch the program. As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
+Double-clicking `geocoder.exe` will launch the program. You may see a popup that says "Windows protected your PC." This file is safe, so bypass this protection by clicking `More info,` and then selecting `Run anyway`.
+
+As a first-time installation, the script will download Python and Git if not present, then download the geocoder from GitHub and install the proper dependencies. The geocoder will be downloaded to a folder called address-geocoder-main. If there are problems with your install, you may try deleting this folder and running `geocoder.exe` again.
 
 Note that this script will attempt to install Python 3.11 on your machine if you do not have Python 3.11 installed on your machine.
 
@@ -123,7 +125,7 @@ input_file: 'example.csv'
 full_address_field:
 
 address_fields:
-  street: addr_st
+  street_address: addr_st
   city: addr_city
   state:
   zip: addr_zip
@@ -162,7 +164,7 @@ full_address_field: address
 
 # OR, IF ADDRESS IS SPLIT INTO MULTIPLE COLUMNS:
 address_fields:
-  street:
+  street_address:
   city:
   state:
   zip:
@@ -192,43 +194,35 @@ So, it is important to provide an input file with as clean as an address field a
 
 ### 2.3 Running a Python Command
 
-Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet.
+Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet. If you choose to run the program this way, you should periodically repeat steps 3-5 below to keep the address file up to date.
 
-Navigate to the project's directory and create a virtual environment:
+Package management is handled using uv, instead of pip. You can read more about uv here: https://docs.astral.sh/uv/
 
+#### Installing uv:
+Follow the instructions for your machine for installing uv here, if you have not installed it already: https://docs.astral.sh/uv/getting-started/installation/
+
+#### Installing dependencies:
+1. Navigate to the package directory if not already there: `cd address-batch-geocoder`
+2. run `uv sync` to install the proper Python version and all package dependencies. This will create a virtual environment at `.venv`:
+3. Next, you will need to download the address file. This can be accessed via a public s3 bucket. It's best if you save this to a subfolder titled `address_geocoder_data`:
 ```
-python -m venv .venv
+mkdir address_geocoder_data
+curl -L -O --output-dir ./address_geocoder_data/ "https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz"
 ```
-
-Then, activate the virtual environment. This will need to be activated every time you want to run the enrichment tool, not just this once:
-
+4. Unzip the file:
 ```
-source .venv/bin/activate
+gunzip address_geocoder_data/address_service_area_summary_public.csv.gz
 ```
-
-Finally, install the packages in requirements.text:
-
+5. The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
 ```
-pip install -r requirements.txt
+uv run csv_to_parquet.py --input_path=address_geocoder_data/address_service_area_summary_public.csv --output_path=address_geocoder_data/address_service_area_summary_public.parquet
 ```
-
-Next, you will need to download the address file. This can be accessed via a public s3 bucket:
-
-```
-https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz
-```
-
-The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
-
-```python
-python csv_to_parquet.py --input_path [INPUT_PATH] --output_path [OUTPUT_PATH]
-```
-
-You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
-
+6. You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
 Once the file is configured, run:
-
-```python geocoder.py```
+```
+uv run geocoder.py --config_path=[PATH_TO_YOUR_CONFIG_FILE]
+```
+running ```uv run geocoder.py``` without the ```--config_path``` argument will default to ```config.yml```
 
 ## 3. Enrichment Fields
 
@@ -270,6 +264,9 @@ Once the file is configured, run:
 |`major_phila_watershed`|
 |`middle_school`|
 |`neighborhood_advisory_committee`|
+|`opa_account_num`|
+|`opa_address`|
+|`opa_owners`|
 |`philly_rising_area`|
 |`planning_district`|
 |`police_district`|
@@ -437,4 +434,3 @@ flowchart TB
     style N fill:#FFF9C4
 
 ```
-
