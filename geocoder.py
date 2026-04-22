@@ -21,7 +21,7 @@ from utils.tomtom_lookup import tomtom_lookup
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 
 def get_current_time():
@@ -663,7 +663,9 @@ class Geocoder:
     def geocode(self) -> None:
         """Full pipeline: Join, save, iterate, write."""
 
-        sink_path = self.out_path + ".tmp.csv"
+        sink_path = Path(self.out_path).with_suffix(".tmp")
+        if sink_path.exists():
+            sink_path.unlink()
 
         processed_rows = 0
         batch = []

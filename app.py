@@ -32,6 +32,7 @@ def init_session_state():
         "api_key_default": "",
         "address_format_default": "Single address field",
         "loaded_filepath": None,
+        "out_path": None,
         "full_address_field_default": None,
         "resume": False,
         "street_col_default": None,
@@ -92,6 +93,9 @@ def on_config_upload():
 
 def on_geocode_click():
     st.session_state["running"] = True
+
+def on_resume_change():
+    st.session_state["resume"] = st.session_state["resume_radio"] == "Resume a partially geocoded file (address mapping must match the previous run)"
 
 # Prevent app from rerunning when this is clicked
 @st.fragment
@@ -155,10 +159,10 @@ def main():
             "Run type",
             resume_options,
             index=1 if st.session_state["resume"] else 0,
+            key="resume_radio",
+            on_change=on_resume_change,
             horizontal=True,
         )
-
-        st.session_state["resume"] = resume == "Resume a partially geocoded file"
     
         # --- Address Format ---
         st.subheader(":blue[Map Address Fields]")
