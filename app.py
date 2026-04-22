@@ -128,7 +128,7 @@ def main():
     # --- CSV Upload & Preview ---
     input_filepath = st.text_input(label="Input file: (paste the full filepath here)", help="Full file path to the file you wish to geocode.").replace('"', '').replace("'", "")
 
-    if st.button("Load file"):
+    if st.button("Load file", type="primary"):
         if not os.path.exists(input_filepath):
             st.error(f"File not found: {input_filepath}")
             st.stop()
@@ -285,7 +285,8 @@ def main():
 
     if ready_to_geocode:
         st.markdown(":blue[Geocoding large files could take a while. Please do not refresh the page.]")
-        if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"]):
+        st.caption("To stop geocoding, close the application window — closing this browser tab will not stop the process.")
+        if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"], type="primary"):
             with st.status("Geocoding... this may take a while. Output file being written to", expanded=True) as status:
                 try:
                     gc = Geocoder(config)
