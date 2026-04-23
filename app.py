@@ -4,14 +4,14 @@ import os
 import tempfile
 import yaml
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
-from geocoder import process_data
+from geocoder import Geocoder
 from pathlib import Path
 
 AIS_API_KEY = os.environ.get("AIS_API_KEY")
 ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
 ENRICHMENT_FIELDS = sorted(POSSIBLE_FIELDS.keys())
 
-
+HOME_DIR = os.path.expanduser('~')
 # UI Configurations
 st.set_page_config(page_title="Address Batch Geocoder", 
                    page_icon=":globe-with-meridians:",
@@ -31,7 +31,10 @@ def init_session_state():
     defaults = {
         "api_key_default": "",
         "address_format_default": "Single address field",
+        "loaded_filepath": None,
+        "out_path": None,
         "full_address_field_default": None,
+        "resume": False,
         "street_col_default": None,
         "city_col_default": None,
         "state_col_default": None,
@@ -73,6 +76,8 @@ def on_config_upload():
 
     st.session_state["enrichment_fields"] = config.get("enrichment_fields", [])
 
+    st.session_state["resume"] = config.get("resume", False)
+
     full_address_field = config.get("full_address_field")
     address_fields = config.get("address_fields") or {}
 
@@ -89,32 +94,13 @@ def on_config_upload():
 def on_geocode_click():
     st.session_state["running"] = True
 
-def call_geocoder_backend(data, config):
-
-    # Write uploaded file to a temp file so process_data can work with a filepath
-    with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
-        tmp.write(data.read())
-        tmp_path = tmp.name
-
-    try:
-        config = {**config, "input_file": tmp_path}
-        result, utf8_filepath = process_data(tmp_path, config)
-        try:
-            df = result.collect()
-        finally:
-            if utf8_filepath:
-                os.remove(utf8_filepath)
-    finally:
-        os.remove(tmp_path)
-
-    # Including bom should write the file such that
-    # excel recognizes it as utf-8
-    return df.write_csv(include_bom=True)
+def on_resume_change():
+    st.session_state["resume"] = st.session_state["resume_radio"] == "Resume a partially geocoded file (address mapping must match the previous run)"
 
 # Prevent app from rerunning when this is clicked
 @st.fragment
 def download_config(config):
-    config_for_download = {**config, "input_file": None} # Make input file none since streamlit cannot access full filepaths
+    config_for_download = {**config} # Make input file none since streamlit cannot access full filepaths
     st.download_button(
         label="Download config",
         data=yaml.dump(config_for_download),
@@ -144,18 +130,38 @@ def main():
     )
 
     # --- CSV Upload & Preview ---
-    uploaded_file = st.file_uploader("Upload a CSV", type=["csv"])
+    input_filepath = st.text_input(label="Input file: (paste the full filepath here)", help="Full file path to the file you wish to geocode.").replace('"', '').replace("'", "")
+
+    if st.button("Load file", type="primary"):
+        if not os.path.exists(input_filepath):
+            st.error(f"File not found: {input_filepath}")
+            
+        st.session_state["loaded_filepath"] = input_filepath
+        st.session_state["geocode_result"] = None
 
     full_address_field = None
     address_fields = {}
 
-    if uploaded_file is not None:
-        preview_df = pd.read_csv(uploaded_file, nrows=5, encoding="latin-1")
+    if st.session_state.get("loaded_filepath"):
+        preview_df = pd.read_csv(st.session_state["loaded_filepath"], nrows=5, encoding="utf-8-sig")
         st.subheader(":blue[Preview (first 5 rows)]")
         st.dataframe(preview_df)
-        uploaded_file.seek(0)
+        st.session_state["loaded_filepath"]
 
         columns = list(preview_df.columns)
+
+        # --- Resume or not ---
+        st.subheader(":blue[Choose a run type]")
+        resume_options = ["Geocode a new file", "Resume a partially geocoded file (address mapping must match the previous run)"]
+
+        resume = st.radio(
+            "Run type",
+            resume_options,
+            index=1 if st.session_state["resume"] else 0,
+            key="resume_radio",
+            on_change=on_resume_change,
+            horizontal=True,
+        )
     
         # --- Address Format ---
         st.subheader(":blue[Map Address Fields]")
@@ -226,18 +232,26 @@ def main():
                 }.items() if v and v != "(none)"
             }
     
+    srids = []
+    enrichment_fields = []
     # --- SRID & Enrichment Fields ---
-    srids = st.multiselect(
-        "Choose which coordinate system (SRID) to use when geocoding. Required.",
-        [4326, 2272],
-        key="srids"
-    )
+    if st.session_state["loaded_filepath"] and not st.session_state["resume"]:
+        st.subheader(":blue[Select Enrichment Fields]")
+        srids = st.multiselect(
+            "Choose which coordinate system (SRID) to use when geocoding. Required.",
+            [4326, 2272],
+        )
 
-    enrichment_fields = st.multiselect(
-        "Choose which fields to add to your data",
-        ENRICHMENT_FIELDS,
-        key="enrichment_fields"
-    )
+        st.session_state.srids = srids
+
+        enrichment_fields = st.multiselect(
+            "Choose which fields to add to your data",
+            ENRICHMENT_FIELDS,
+            key="enrichment_fields"
+        )
+    
+    else:
+        enrichment_fields = []
 
     # --- Config Upload ---
     st.file_uploader(
@@ -253,38 +267,48 @@ def main():
     # --- Build Config ---
     config = {
         "AIS_API_KEY": api_key,
-        "input_file": uploaded_file.name if uploaded_file else None,
+        "input_file": st.session_state["loaded_filepath"] if st.session_state["loaded_filepath"] else None,
         "address_file": ADDRESS_FILE,
         "full_address_field": full_address_field,
         "address_fields": address_fields,
+        "resume": st.session_state["resume"], 
         "enrichment_fields": enrichment_fields,
-        "srid_4326": 4326 in srids,
-        "srid_2272": 2272 in srids,
+        "srid_4326": 4326 in st.session_state.get("srids", []),
+        "srid_2272": 2272 in st.session_state.get("srids", []),
 
     }
 
     # --- Geocode ---
     ready_to_geocode = (
-        uploaded_file
+        st.session_state["loaded_filepath"]
         and api_key
-        and any(srid in srids for srid in [4326, 2272])
+        and (st.session_state["resume"] or any(srid in srids for srid in [4326, 2272]))
         and (full_address_field or address_fields)
     )
 
     if ready_to_geocode:
         st.markdown(":blue[Geocoding large files could take a while. Please do not refresh the page.]")
-        if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"]):
-            with st.spinner("Geocoding..."):
+        st.caption("To stop geocoding, close the application window — closing this browser tab will not stop the process.")
+        if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"], type="primary"):
+            with st.status("Geocoding... this may take a while. Output file being written to", expanded=True) as status:
                 try:
-                    result_bytes = call_geocoder_backend(uploaded_file, config)
-                    st.session_state["geocode_result"] = result_bytes
+                    gc = Geocoder(config)
+                    gc.geocode()
                     st.session_state["geocode_error"] = None
+                    st.session_state["out_path"] = gc.out_path
+                    status.update(label = "Geocoding complete!", state="complete")
                 except ValueError as e:
                     st.session_state["geocode_error"] = f"Configuration error: {e}"
+                    status.update(label="Configuration error", state="error")
                 except Exception as e:
                     st.session_state["geocode_error"] = f"Error: {e}"
+                    status.update(label="Geocoding failed", state="error")
                 finally:
                     st.session_state["running"] = False
+
+                    # Only show success message if there wasn't an error
+                    if not st.session_state.get("geocode_error"):
+                        st.session_state["geocode_result"] = True
             
             st.rerun()
         
@@ -294,18 +318,7 @@ def main():
         st.error(st.session_state["geocode_error"])
     
     if st.session_state.get("geocode_result"):
-        st.success("Geocoding complete!")
-
-
-
-        st.download_button(
-            label="Download enriched file",
-            data=st.session_state["geocode_result"],
-            file_name=f"{Path(uploaded_file.name).stem}_enriched.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            on_click="ignore",
-        )
+        st.success(f"Geocoding complete! File available at {st.session_state['out_path']}")
 
 if __name__ == "__main__":
     main()

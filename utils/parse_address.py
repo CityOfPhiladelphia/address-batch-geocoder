@@ -143,6 +143,26 @@ def is_non_philly_from_split_address(
 
     return flag_non_philly_address(address_data, zips)
 
+def is_non_philly(address: str | dict | None, address_is_split: bool, zips) -> dict:
+    """Determines whether an address is in Philadelphia. Handles
+    A string full address or a dict split address.
+    
+    Args:
+        address (str | dict | None)
+        address_is_split (bool): whether or not the address is the full address, or split
+        zips: list of Philadelphia zip codes
+    
+    Returns:
+        dict: {'is_non_philly': bool, 'is_undefined': bool}
+    """
+
+    if address is None:
+        return {"is_non_philly": False, "is_undefined": True}
+    
+    # If address is in full address form, we need to tag it
+    address_data = address if address_is_split else tag_full_address(address)
+
+    return flag_non_philly_address(address_data, zips)
 
 def find_address_fields(config) -> dict[str]:
     """
