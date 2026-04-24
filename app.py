@@ -346,7 +346,6 @@ def render_geocode_button(config):
 def main():
     init_session_state()
     config = {}
-    st.write(st.session_state)
 
     # --- YAML Config Upload Prompt --- #
     st.segmented_control(
