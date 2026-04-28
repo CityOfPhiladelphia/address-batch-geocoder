@@ -1,0 +1,5 @@
+import os
+from mapping.ais_properties_fields import POSSIBLE_FIELDS
+
+ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
+ENRICHMENT_FIELDS = sorted(POSSIBLE_FIELDS.keys())
