@@ -1,0 +1,22 @@
+# Default: normalize to LF in repo, let OS handle checkout
+* text=auto eol=lf
+
+# Explicitly text files — always LF
+*.py    text eol=lf
+*.toml  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.lock  text eol=lf
+.gitattributes text eol=lf
+
+# Windows scripts — CRLF on checkout (important!)
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary files — no conversion
+*.exe   binary
+*.parquet binary
+*.zip   binary

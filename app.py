@@ -1,15 +1,11 @@
 import streamlit as st
 import pandas as pd
-import os
 import yaml
-from mapping.ais_properties_fields import POSSIBLE_FIELDS
+from ui.constants import ADDRESS_FILE, ENRICHMENT_FIELDS
+from ui.logic import filtered_options, ready_to_geocode, parse_config
 from geocoder import Geocoder
 
-AIS_API_KEY = os.environ.get("AIS_API_KEY")
-ADDRESS_FILE = './geocoder_address_data/address_service_area_summary.parquet'
-ENRICHMENT_FIELDS = sorted(POSSIBLE_FIELDS.keys())
 
-HOME_DIR = os.path.expanduser('~')
 # UI Configurations
 # --------- Header and Title -------- #
 st.set_page_config(page_title="Address Batch Geocoder", 
@@ -18,26 +14,13 @@ st.set_page_config(page_title="Address Batch Geocoder",
 
 st.markdown(" # :blue[Address Batch Geocoder]")
 
- 
-def filtered_options(columns, exclude: set, none_option=False) -> list:
-    """
-    Returns a filtered list of options, based on what options have already been
-    selected
-    """
-    if none_option:
-        return ["(none)"] + [c for c in columns if c not in exclude]
-    else:
-        return [c for c in columns if c not in exclude]
-
 def init_session_state():
     """Initialize all session state defaults on first run."""
 
     defaults = {
-        "yaml_upload": None,
         "yaml_config_path": None,
-        "api_key_default": "",
+        "api_key": None,
         "address_format_default": "Single address field",
-        "input_filepath": "",
         "input_loaded": False,
         "out_path": None,
         "full_address_field_default": None,
@@ -67,44 +50,17 @@ def on_config_upload():
         return
 
     try:
-        config = yaml.safe_load(uploaded)
+        yaml_loaded = yaml.safe_load(uploaded)
+        parsed_config = parse_config(yaml_loaded)
     
     except yaml.YAMLError as e:
         st.session_state["config_load_error"] = f"Could not parse config file: {e}"
         return
     
-    st.session_state["input_filepath"] = config.get("input_file", "")
-
-    st.session_state["config_load_error"] = None
-
-    st.session_state["api_key_default"] = config.get("AIS_API_KEY", "")
-
-    srids = []
-    if config.get("srid_4326"):
-        srids.append(4326)
-    if config.get("srid_2272"):
-        srids.append(2272)
-    st.session_state["srids"] = srids
-
-    st.session_state["enrichment_fields"] = config.get("enrichment_fields", [])
-
-    st.session_state["resume"] = config.get("resume", False)
-
-    full_address_field = config.get("full_address_field")
-    address_fields = config.get("address_fields") or {}
-
-    if full_address_field:
-        st.session_state["address_format_default"] = "Single address field"
-        st.session_state["full_address_field_default"] = full_address_field
-    elif address_fields:
-        st.session_state["address_format_default"] = "Separate address / city / state / zip"
-        st.session_state["street_col_default"] = address_fields.get("street_address")
-        st.session_state["city_col_default"] = address_fields.get("city")
-        st.session_state["state_col_default"] = address_fields.get("state")
-        st.session_state["zip_col_default"] = address_fields.get("zip")
+    st.session_state.update(parsed_config)
 
 def on_filepath_change():
-    st.session_state["input_filepath"] = st.session_state["input_filepath"].strip('"\'')
+    st.session_state["input_filepath"] = st.session_state.get("input_filepath", "").strip('"\'')
     st.session_state["input_loaded"] = False
     st.session_state["geocode_result"] = None
 
@@ -156,6 +112,7 @@ def render_config_form() -> dict:
             options=resume_opts,
             key="resume_select",
             selection_mode="single",
+            required=True,
             default=resume_opts[0] if not st.session_state.get("resume") else resume_opts[1],
             on_change=on_resume_change,
         )
@@ -163,21 +120,19 @@ def render_config_form() -> dict:
         st.subheader(":blue[Configure your run below:]")
 
         # --- API Key ---
-        api_key = st.text_input(
+        st.text_input(
             "Address Information System (AIS) API key. Required.",
-            value=st.session_state["api_key_default"],
             key="api_key"
         )
 
         # --- CSV Upload & Preview ---
         st.text_input(label="Input file: (paste the full filepath here)", 
                     help="Full file path to the file you wish to geocode.", 
-                    value=st.session_state.get("input_filepath", ""),
                     key="input_filepath",
                     on_change=on_filepath_change
                     )
 
-        if st.session_state.get("input_filepath").endswith(".csv"):
+        if st.session_state.get("input_filepath", "").endswith(".csv"):
             if st.button("Load file", type="primary", on_click=on_file_load):                
                 st.session_state["geocode_result"] = None
 
@@ -200,6 +155,9 @@ def render_config_form() -> dict:
         
             # --- Address Format ---
             st.subheader(":blue[Map Address Fields]")
+
+            if st.session_state["resume"]:
+                st.markdown(":blue[Address field mapping must match the one from the previous run.]")
 
             format_options = ["Single address field", "Separate address / city / state / zip"]
             format_default_idx = format_options.index(st.session_state["address_format_default"])
@@ -282,12 +240,11 @@ def render_config_form() -> dict:
                 ENRICHMENT_FIELDS,
                 key="enrichment_fields"
             )
-        
         else:
             enrichment_fields = []
 
         config = {
-            "AIS_API_KEY": api_key,
+            "AIS_API_KEY": st.session_state["api_key"],
             "input_file": st.session_state["input_filepath"] if st.session_state["input_loaded"] else None,
             "address_file": ADDRESS_FILE,
             "full_address_field": full_address_field,
@@ -302,14 +259,7 @@ def render_config_form() -> dict:
 
 def render_geocode_button(config):
     # --- Geocode ---
-    ready_to_geocode = (
-    st.session_state["input_loaded"]
-    and config.get("AIS_API_KEY")
-    and (st.session_state["resume"] or config.get("srid_4326") or config.get("srid_2272"))
-    and (config.get("full_address_field") or config.get("address_fields"))
-)
-
-    if ready_to_geocode:
+    if ready_to_geocode(st.session_state, config):
         st.markdown(":blue[Geocoding large files could take a while. Please do not refresh the page.]")
         st.caption("To stop geocoding, close the application window — closing this browser tab will not stop the process.")
         if st.button("Geocode", on_click=on_geocode_click, disabled=st.session_state["running"], type="primary"):
@@ -350,9 +300,10 @@ def main():
     # --- YAML Config Upload Prompt --- #
     st.segmented_control(
         "How would you like to configure this run?",
-        options=["Load settings from a file", "Enter settings below"],
+        options=["Enter settings below", "Load settings from a file"],
         selection_mode="single",
-        default=None,
+        default="Enter settings below",
+        required=True,
         key="yaml_upload"
     )
 

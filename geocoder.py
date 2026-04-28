@@ -356,7 +356,7 @@ class Geocoder:
         """
         Given a polars LazyFrame, splits into two lazy frames:
         One for addresses located in Philadelphia, one for addresses
-        not located in Philadelphia.P
+        not located in Philadelphia.
 
         Returns:
             (philly_lf, non_philly_lf)
