@@ -144,7 +144,6 @@ def render_config_form() -> dict:
                 preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig")
                 st.subheader(":blue[Preview (first 5 rows)]")
                 st.dataframe(preview_df)
-                st.session_state["input_loaded"]
             
             except FileNotFoundError as e:
                 st.session_state["file_not_found_error"] = f"Error: {e}"
