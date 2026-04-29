@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from passyunk.parser import PassyunkParser
 from functools import partial
 from utils.zips import ZIPS

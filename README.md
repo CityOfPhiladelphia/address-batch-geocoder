@@ -18,10 +18,6 @@ fields that the user supplies.
 
 The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
-## Note:
-
-For more information about the geocoder, consult the GitHub repository: https://github.com/CityOfPhiladelphia/address-geocoder. The README in this repo contains more details about the matching process, and information about how to run the geocoder from the command line, if desired.
-
 ## Questions?
 If you have questions about the geocoder that this FAQ cannot answer, feel free to contact citygeo at: maps@phila.gov
 
@@ -118,7 +114,13 @@ AIS_API_KEY:
 input_file: ./data/example_input_4.csv
 address_file: ./geocoder_address_data/address_service_area_summary.parquet
 ```
-4. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
+4. The geocoder writes data incrementally. If your previous geocoding session was interrupted before it finished, you have the option to resume that file. In that case, you will set:
+```
+resume: True
+```
+You will still need to provide the name of the non-geocoded input file as the input file. The partially geocoded file must exist in the same directory as the
+input file, with the format {input_file_name}_enriched.csv.
+5. Map the address fields to the name of the fields in the csv that you wish to process. If you have one combined address field, map it to full_address_field. Otherwise, leave full_address_field blank and map column names to street, city, state, and zip. Street must be included, while the others are optional.
 
 Example, for a csv with the following fields:
 `addr_st, addr_city, addr_zip`
@@ -137,7 +139,7 @@ address_fields:
 ```
 If you have both full_address_field and the address fields filled in, the script will ask you which to use.
 
-5. List which fields other than latitude and longitude you want to add.
+6. List which fields other than latitude and longitude you want to add.
   (Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
   A complete list of valid fields can be found further down in this README. 
 
@@ -147,7 +149,7 @@ enrichment_fields:
   - census_block_group_2020
   - census_block_2020
 ```
-6. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
+7. List which SRIDs should be returned. SRID refers to the format of the coordinate system. There are two options: 4326 and 2272. 4326 is the WGS84 standard, and will be output as `geocode_lat` and `geocode_lon` and 2272 Southern Pennsylvania Projection and is output as `geocode_x` and `geocode_y`. 
 
 ```
 # Which SRIDs to return for geocoding
@@ -163,6 +165,8 @@ AIS_API_KEY: YOUR_API_KEY
 # File Config
 input_file: ./data/example_input_4.csv
 address_file: ./data/addresses.parquet
+
+resume: False
 
 full_address_field: address
 
@@ -180,7 +184,7 @@ enrichment_fields:
   - census_block_2020
 ```
 
-7. You're now ready to run the geocoder.
+8. You're now ready to run the geocoder.
 
 Double-click `geocoder.exe` -- the same file that you used to instal geocoder.
 
@@ -198,43 +202,35 @@ So, it is important to provide an input file with as clean as an address field a
 
 ### 2.3 Running a Python Command
 
-Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet.
+Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet. If you choose to run the program this way, you should periodically repeat steps 3-5 below to keep the address file up to date.
 
-Navigate to the project's directory and create a virtual environment:
+Package management is handled using uv, instead of pip. You can read more about uv here: https://docs.astral.sh/uv/
 
+#### Installing uv:
+Follow the instructions for your machine for installing uv here, if you have not installed it already: https://docs.astral.sh/uv/getting-started/installation/
+
+#### Installing dependencies:
+1. Navigate to the package directory if not already there: `cd address-batch-geocoder`
+2. run `uv sync` to install the proper Python version and all package dependencies. This will create a virtual environment at `.venv`:
+3. Next, you will need to download the address file. This can be accessed via a public s3 bucket. It's best if you save this to a subfolder titled `address_geocoder_data`:
 ```
-python -m venv .venv
+mkdir address_geocoder_data
+curl -L -O --output-dir ./address_geocoder_data/ "https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz"
 ```
-
-Then, activate the virtual environment. This will need to be activated every time you want to run the enrichment tool, not just this once:
-
+4. Unzip the file:
 ```
-source .venv/bin/activate
+gunzip address_geocoder_data/address_service_area_summary_public.csv.gz
 ```
-
-Finally, install the packages in requirements.text:
-
+5. The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
 ```
-pip install -r requirements.txt
+uv run csv_to_parquet.py --input_path=address_geocoder_data/address_service_area_summary_public.csv --output_path=address_geocoder_data/address_service_area_summary_public.parquet
 ```
-
-Next, you will need to download the address file. This can be accessed via a public s3 bucket:
-
-```
-https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz
-```
-
-The file will need to be converted to a parquet file in order to work with the geocoder. You can do this by running the `csv_to_parquet.py` file in the repo.
-
-```python
-python csv_to_parquet.py --input_path [INPUT_PATH] --output_path [OUTPUT_PATH]
-```
-
-You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
-
+6. You will need to configure a config.yml file. You can use config_example.yml as a template. See section #2.2 for instructions on how to configure this file.
 Once the file is configured, run:
-
-```python geocoder.py```
+```
+uv run geocoder.py --config_path=[PATH_TO_YOUR_CONFIG_FILE]
+```
+running ```uv run geocoder.py``` without the ```--config_path``` argument will default to ```config.yml```
 
 ## 3. Enrichment Fields
 
