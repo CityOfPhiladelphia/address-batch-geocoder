@@ -314,7 +314,7 @@ class Geocoder:
         Coerces boolean fields back from strings."""
         
         bool_fields = {"is_undefined", "is_non_philly", 
-                       "is_addr", "is_philly_addr"}
+                       "is_addr", "is_philly_addr", "is_multiple_match"}
         
         with open(tmp_path, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
