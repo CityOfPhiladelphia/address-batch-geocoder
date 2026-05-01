@@ -257,6 +257,10 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`eclipse_location_id`|
 |`elementary_school`|
 |`engine_local`|
+|`h3_hex_grid_r7`|
+|`h3_hex_grid_r8`|
+|`h3_hex_grid_r9`|
+|`h3_hex_grid_r10`|
 |`high_school`|
 |`highway_district`|
 |`highway_section`|
@@ -294,6 +298,7 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`sanitation_area`|
 |`sanitation_convenience_center`|
 |`sanitation_district`|
+|`secondary_rubbish_day`|
 |`seg_id`|
 |`state_house_rep_2012`|
 |`state_house_rep_2022`|
@@ -307,6 +312,8 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`street_suffix`|
 |`traffic_district`|
 |`traffic_pm_district`|
+|`tobacco_free_school_zones`|
+|`tobacco_retailer_permit_capped`|
 |`unit_num`|
 |`unit_type`|
 |`us_congressional_2012`|
@@ -393,6 +400,22 @@ git push origin v1.0.0
 ```
 
 Publishing a new release will trigger the `build-and-publish` workflow, which calls the following command to create an executable file from the powershell script: `Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false`
+
+#### 4.4 Publishing a Breaking Change
+
+If your updates will cause previous installs of the geocoder to fail to work, (For example, a major change to how the powershell script interfaces with the backend), you will need to create a release as mentioned above and update `powershell/min_exe_version.txt` to match the version in the change. This will prevent the user from being able to run the executable if their version is older than the breaking change.
+
+To publish a breaking change:
+1. Update `powershell/min_exe_version.txt` to the latest semver number. The format is `v2.0.0`. In the future, we plan to remove the 'v' from the string.
+2. Update `powershell/geocoder_for_exe.ps1` so that `$exeVersion` variable matches the latest semver number
+3. Please flag in any PR that you have created a breaking change, and have a second person review.
+4. Once merged, create a release and push to main with the latest semver number
+
+The check works as follows:
+1. The exe should pull the most recent code on `main`, which will pull the latest copy of `min_exe_version.txt`.
+2. The exe will check the executable version in the file against `powershell/min_exe_version.txt`. **You must update the $exeVersion variable in the powershell file for this to work**. This check works by stripping the "v" from the semver string, and then using powershell's `[System.Version]` to compare versions.
+3. If the executable version is too low, the script will give the user an error and exit.
+
 
 ## 5. Matching Process
 

@@ -144,7 +144,6 @@ def render_config_form() -> dict:
                 preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig")
                 st.subheader(":blue[Preview (first 5 rows)]")
                 st.dataframe(preview_df)
-                st.session_state["input_loaded"]
             
             except FileNotFoundError as e:
                 st.session_state["file_not_found_error"] = f"Error: {e}"
@@ -232,7 +231,13 @@ def render_config_form() -> dict:
             st.multiselect(
                 "Choose which coordinate system (SRID) to use when geocoding. Required.",
                 [4326, 2272],
-                key="srids"
+                key="srids",
+                format_func=lambda x: (
+                    "4326 - (WGS 84)"
+                    if x == 4326
+                    else "2272 - (NAD83 / Pennsylvania South State Plane)"
+                ),
+                help="The 4326 spatial reference identifier is the generic global standard, represented by latitudinal and longitudinal points. However, 2272 is optimized for Philadelphia addresses and minimizes geometrical distortion.",
             )
 
             enrichment_fields = st.multiselect(
