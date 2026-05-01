@@ -257,6 +257,10 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`eclipse_location_id`|
 |`elementary_school`|
 |`engine_local`|
+|`h3_hex_grid_r7`|
+|`h3_hex_grid_r8`|
+|`h3_hex_grid_r9`|
+|`h3_hex_grid_r10`|
 |`high_school`|
 |`highway_district`|
 |`highway_section`|
@@ -294,6 +298,7 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`sanitation_area`|
 |`sanitation_convenience_center`|
 |`sanitation_district`|
+|`secondary_rubbish_day`|
 |`seg_id`|
 |`state_house_rep_2012`|
 |`state_house_rep_2022`|
@@ -307,6 +312,8 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`street_suffix`|
 |`traffic_district`|
 |`traffic_pm_district`|
+|`tobacco_free_school_zones`|
+|`tobacco_retailer_permit_capped`|
 |`unit_num`|
 |`unit_type`|
 |`us_congressional_2012`|
