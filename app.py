@@ -96,6 +96,27 @@ def render_yaml_upload():
     if st.session_state.get("config_load_error"):
         st.error(st.session_state["config_load_error"])
 
+def render_api_key_input():
+
+    with st.popover(
+        "How to get an AIS key",
+        type="secondary",
+        icon="🔑",
+
+    ):
+        st.markdown("""
+        ### Obtaining an AIS Key
+        To obtain a key:
+        1. Email [ithelp@phila.gov](mailto:ithelp@phila.gov?cc=maps@phila.gov) to create a new support ticket, and copy **maps@phila.gov** on the email.
+        2. Request that IT Help route the ticket to CityGeo.
+        3. Mention that the AIS Key is to use the batch geocoder, and provide a link to this GitHub repository for context.
+        """)
+        
+    st.text_input(
+    "Address Information System (AIS) API key. Required.",
+    key="api_key"
+    )
+
 
 def render_config_form() -> dict:
 
@@ -119,11 +140,8 @@ def render_config_form() -> dict:
 
         st.subheader(":blue[Configure your run below:]")
 
-        # --- API Key ---
-        st.text_input(
-            "Address Information System (AIS) API key. Required.",
-            key="api_key"
-        )
+        # --- API Key Input --- 
+        render_api_key_input()
 
         # --- CSV Upload & Preview ---
         st.text_input(label="Input file: (paste the full filepath here)", 

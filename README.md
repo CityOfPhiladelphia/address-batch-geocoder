@@ -24,7 +24,13 @@ If you have questions about the geocoder that this FAQ cannot answer, feel free 
 ## 1. Prerequisites
 You will need the following things:
 1. An executable file called `geocoder.exe`. This is used to run the program. Do not save the executable in a folder that has spaces in the name.	
-2. An AIS API key, provided to you by CityGeo.
+2. An AIS API key, provided to you by CityGeo. Instructions on how to obtain this are below.
+
+### Obtaining an AIS Key
+To obtain a key:
+1. Email ithelp@phila.gov to create a new support ticket, and copy maps@phila.gov on the email.
+2. Request that IT Help route the ticket to CityGeo.
+3. Mention that the AIS Key is to use the batch geocoder, and provide a link to this GitHub repository for context.
 
 
 ## Installation
