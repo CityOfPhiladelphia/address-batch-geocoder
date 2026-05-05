@@ -144,7 +144,7 @@ def render_config_form() -> dict:
 
         if st.session_state.get("input_filepath") and st.session_state.get("input_loaded"):
             try:
-                preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig")
+                preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig", dtype="str")
                 st.subheader(":blue[Preview (first 5 rows)]")
                 st.dataframe(preview_df)
             
