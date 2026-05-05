@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import yaml
-from ui.constants import ADDRESS_FILE, ENRICHMENT_FIELDS
+from ui.constants import ADDRESS_FILE, ENRICHMENT_FIELDS, HOW_TO_FILEPATH
 from ui.logic import filtered_options, ready_to_geocode, parse_config
+from ui.how_to import render_how_to_page
 from geocoder import Geocoder
+from pathlib import Path 
 
 
 # UI Configurations
@@ -122,6 +124,7 @@ def render_config_form() -> dict:
         # --- API Key ---
         st.text_input(
             "Address Information System (AIS) API key. Required.",
+            help="Please contact CityGeo to receive an API key if you do not have one.",
             key="api_key"
         )
 
@@ -141,7 +144,7 @@ def render_config_form() -> dict:
 
         if st.session_state.get("input_filepath") and st.session_state.get("input_loaded"):
             try:
-                preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig")
+                preview_df = pd.read_csv(st.session_state["input_filepath"], nrows=5, encoding="utf-8-sig", dtype="str")
                 st.subheader(":blue[Preview (first 5 rows)]")
                 st.dataframe(preview_df)
             
@@ -298,28 +301,34 @@ def render_geocode_button(config):
     if st.session_state.get("geocode_result"):
         st.success(f"Geocoding complete! File available at {st.session_state['out_path']}")
 
-def main():
+def main(): 
     init_session_state()
     config = {}
 
-    # --- YAML Config Upload Prompt --- #
-    st.segmented_control(
-        "How would you like to configure this run?",
-        options=["Enter settings below", "Load settings from a file"],
-        selection_mode="single",
-        default="Enter settings below",
-        required=True,
-        key="yaml_upload"
-    )
+    tab1, tab2 = st.tabs(["🌐 Geocoder", "❓ How-To"])
 
-    if st.session_state["yaml_upload"] == "Load settings from a file":
-        render_yaml_upload()
-        config = render_config_form()
-    
-    if st.session_state["yaml_upload"] == "Enter settings below":
-        config = render_config_form()
+    with tab1:
+    # --- YAML Config Upload Prompt --- #
+        st.segmented_control(
+            "How would you like to configure this run?",
+            options=["Enter settings below", "Load settings from a file"],
+            selection_mode="single",
+            default="Enter settings below",
+            required=True,
+            key="yaml_upload"
+        )
+
+        if st.session_state["yaml_upload"] == "Load settings from a file":
+            render_yaml_upload()
+            config = render_config_form()
         
-    render_geocode_button(config)
+        if st.session_state["yaml_upload"] == "Enter settings below":
+            config = render_config_form()
+            
+        render_geocode_button(config)
+    
+    with tab2:
+        render_how_to_page(HOW_TO_FILEPATH)
 
 if __name__ == "__main__":
     main()
