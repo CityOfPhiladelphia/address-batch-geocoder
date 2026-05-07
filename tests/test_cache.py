@@ -18,7 +18,7 @@ def test_cache_ejects_first_inserted():
     
     assert cache[1] == None
 
-def test_cache_ejects_last_used():
+def test_cache_keeps_last_inserted():
     cache = LRUCache(max_size=20)
 
     for i in range(30):
