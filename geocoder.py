@@ -196,7 +196,7 @@ class Geocoder:
 
     def __init__(self, config: dict):
         self.config: dict = config
-        self.cache = LRUCache(max_size=20_000)
+        self.cache = LRUCache()
 
         # Perform checks to ensure that config is set up properly
         self.api_key = config.get("AIS_API_KEY")

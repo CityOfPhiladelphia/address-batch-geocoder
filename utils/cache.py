@@ -24,3 +24,6 @@ class LRUCache:
         if len(self._cache) > self.max_size:
             self._cache.popitem(last=False)
     
+    def __len__(self):
+        return len(self._cache)
+    
