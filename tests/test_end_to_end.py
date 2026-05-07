@@ -2,6 +2,7 @@ import pytest
 import shutil
 import polars as pl
 import os
+import socket
 from click.testing import CliRunner
 from geocoder import run_process_csv, Geocoder
 from pathlib import Path
@@ -12,6 +13,18 @@ TEST_CSV = TEST_DIR / "sample_file_input.csv"
 CONFIG_FILE_PATH = TEST_DIR / "config_for_tests.yml"
 
 import yaml
+
+def tomtom_is_reachable():
+    try:
+        socket.getaddrinfo("citygeo-geocoder-aws.phila.city", 443)
+        return True
+    except socket.gaierror:
+        return False
+    
+pytestmark = pytest.mark.skipif(
+    not tomtom_is_reachable(),
+    reason="Tomtom host unreachable"
+)
 
 @pytest.fixture(scope="session")
 def geocoded_output(tmp_path_factory):
