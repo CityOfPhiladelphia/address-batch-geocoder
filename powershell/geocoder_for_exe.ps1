@@ -2,7 +2,7 @@
 #####
 
 # Get the directory of the currently executing script
-$ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path) 
+$ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path)
 $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 
 # Paths needed for script
@@ -417,8 +417,14 @@ if ($script:RepoWasJustCloned) {
 switch ($runOption) {
     '1' {
        try {
-
+    
+    # Surround with quotes to avoid issues with filepaths with spaces in the name
     $appPy = Join-Path $installFolder 'app.py'  # adjust to your actual entrypoint
+    $appPy = '"' + $appPy + '"'
+
+    Write-Host "Python: $venvPython"
+    Write-Host "App: $appPy"
+    Write-Host "Working dir: $ScriptDirectory"
     $process = Start-Process -FilePath $venvPython `
                             -ArgumentList "-m", "streamlit", "run", $appPy `
                             -WorkingDirectory $ScriptDirectory `
@@ -445,6 +451,9 @@ finally {
     '2' {
         try {
     # Use Start-Process to allow interactive prompts
+    # Surround with quotes to avoid issues with filepaths with spaces in the name
+    $geocoderPy = '"' + $geocoderPy + '"'
+
     $process = Start-Process -FilePath $venvPython `
                              -ArgumentList $geocoderPy `
                              -WorkingDirectory $ScriptDirectory `
