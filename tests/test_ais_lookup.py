@@ -147,15 +147,14 @@ def test_ais_lookup_only_fetches_4326(monkeypatch):
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
+        "geocode_x": None,
+        "geocode_y": None,
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
         "geocoder_used": "ais",
         "is_multiple_match": False,
     }
-    # Ensure geocode_x and geocode_y are not in result
-    assert "geocode_x" not in result
-    assert "geocode_y" not in result
 
 
 def test_ais_lookup_only_fetches_2272(monkeypatch):
@@ -225,6 +224,8 @@ def test_ais_lookup_only_fetches_2272(monkeypatch):
     )
 
     assert result == {
+        "geocode_lat": None,
+        "geocode_lon": None,
         "geocode_x": "2694393.35",
         "geocode_y": "235982.72",
         "is_addr": True,
@@ -233,9 +234,6 @@ def test_ais_lookup_only_fetches_2272(monkeypatch):
         "geocoder_used": "ais",
         "is_multiple_match": False,
     }
-    # Ensure geocode_lat and geocode_lon are not in result
-    assert "geocode_lat" not in result
-    assert "geocode_lon" not in result
 
 
 def test_ais_lookup_tiebreaks(monkeypatch):

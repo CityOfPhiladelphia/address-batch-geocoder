@@ -102,7 +102,7 @@ def test_parse_non_philly_address():
     is_addr = parsed["is_addr"]
     is_philly_addr = parsed["is_philly_addr"]
 
-    assert addr == "123 fake st"
+    assert addr == "123 FAKE ST"
     assert not is_addr
     assert not is_philly_addr
 
@@ -113,7 +113,7 @@ def test_parse_non_address():
     is_addr = parsed["is_addr"]
     is_philly_addr = parsed["is_philly_addr"]
 
-    assert addr == "not an address"
+    assert addr == "NOT AN ADDRESS"
     assert not is_addr
     assert not is_philly_addr
 
