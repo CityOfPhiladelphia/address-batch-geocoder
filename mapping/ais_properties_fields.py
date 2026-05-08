@@ -56,6 +56,7 @@ POSSIBLE_FIELDS = {
     "police_district": "police_district",
     "police_service_area": "police_service_area",
     "rubbish_recycle_day": "rubbish_recycle_day",
+    "secondary_rubbish_day": "secondary_rubbish_day",
     "recycling_diversion_rate": "recycling_diversion_rate",
     "leaf_collection_area": "leaf_collection_area",
     "sanitation_area": "sanitation_area",
@@ -80,4 +81,10 @@ POSSIBLE_FIELDS = {
     "ppr_friends": "ppr_friends",
     "engine_local": "engine_local",
     "ladder_local": "ladder_local",
+    "tobacco_retailer_permit_capped": "tobacco_retailer_permit_capped",
+    "tobacco_free_school_zones": "tobacco_free_school_zones",
+    "h3_hex_grid_r7": "h3_hex_grid_r7",
+    "h3_hex_grid_r8": "h3_hex_grid_r8",
+    "h3_hex_grid_r9": "h3_hex_grid_r9",
+    "h3_hex_grid_r10": "h3_hex_grid_r10"
 }

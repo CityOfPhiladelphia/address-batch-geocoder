@@ -5,10 +5,11 @@ import click
 import os
 import tempfile
 import csv
-import warnings
+import re
 from collections.abc import Generator
 from datetime import datetime
 from functools import partial
+from utils.cache import LRUCache
 from utils.encoder import detect_file_encoding, recode_to_utf8
 from utils.parse_address import (
     find_address_fields,
@@ -195,6 +196,7 @@ class Geocoder:
 
     def __init__(self, config: dict):
         self.config: dict = config
+        self.cache = LRUCache(max_size=20_000)
 
         # Perform checks to ensure that config is set up properly
         self.api_key = config.get("AIS_API_KEY")
@@ -619,6 +621,13 @@ class Geocoder:
         """
         AIS -> TomTom -> Conditional AIS re-match for a single unmatched record.
         """
+        # First check and see if the record is in the cache
+        addr = record.get("raw_address")
+        if addr:
+            cached = self.cache[addr]
+
+            if cached:
+                return cached
 
         # ------------ First AIS Match --------------- #
 
@@ -636,6 +645,8 @@ class Geocoder:
             record.update(self._run_ais_lookup(record))
         
         if self._is_matched(record):
+            if addr:
+                self.cache[addr] = record
             return record
         
         # ------------ TomTom Match --------------- #
@@ -649,6 +660,8 @@ class Geocoder:
         # If it didn't match with TomTom, we've failed to match the record.
         # return it.
         if not self._is_matched(record):
+            if addr:
+                self.cache[addr] = record
             return record
         
         # ------------ AIS Rematch Attempt --------------- #
@@ -664,6 +677,11 @@ class Geocoder:
             
             # else: AIS failed, keep TomTom result as-is
         
+
+        # Now that we've processed the record, add it to the cache
+        if addr:
+            self.cache[addr] = record
+
         return record
 
     def _to_output_record(self, record: dict) -> dict:
@@ -746,8 +764,18 @@ def run_process_csv(config_path):
     current_time = get_current_time()
     print(f"Beginning enrichment process at {current_time}.")
 
+    # Handle windows filepaths
+    # Yaml treats \ as an escape character
+    # So this breaks reading it. We need to replace with double \\
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+
+        cleaned = re.sub(
+            r'"([A-Za-z]:\\[^"]*)"',
+            lambda m: "'" + m.group(1) + "'",
+            f.read()
+            )
+        
+        config = yaml.safe_load(cleaned)
 
     geocoder = Geocoder(config)
     geocoder.geocode()
@@ -756,7 +784,6 @@ def run_process_csv(config_path):
     
     current_time = get_current_time()
     print(f"Enrichment complete at {current_time}. Output saved to {geocoder.out_path}.")
-
 
 if __name__ == "__main__":
     run_process_csv()

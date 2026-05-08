@@ -13,8 +13,9 @@ fields that the user supplies.
 2. Compares the standardized data to a local parquet file, `addresses.parquet`, and adds the user-specified fields as well as latitude and longitude from that file
 3. Not all records will match to the address file. For those records that do not match, `Address-Batch-Geocoder` queries the Address Information System (AIS) API and adds returned fields. Please note that this process can take some time, so processing large files with a messy address field is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take approximately 3-4 minutes.
 4. Records that don't match to the AIS API are then queried against TomTom, which has different address parsing capabilities and is also able to return
-5. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
-6. The enriched file is then saved to the same directory as the input file.
+5. To reduce redundant API calls, the geocoder caches AIS and TomTom results for duplicate addresses within a single run.
+6. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
+7. The enriched file is then saved to the same directory as the input file.
 
 The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
@@ -257,6 +258,10 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`eclipse_location_id`|
 |`elementary_school`|
 |`engine_local`|
+|`h3_hex_grid_r7`|
+|`h3_hex_grid_r8`|
+|`h3_hex_grid_r9`|
+|`h3_hex_grid_r10`|
 |`high_school`|
 |`highway_district`|
 |`highway_section`|
@@ -294,6 +299,7 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`sanitation_area`|
 |`sanitation_convenience_center`|
 |`sanitation_district`|
+|`secondary_rubbish_day`|
 |`seg_id`|
 |`state_house_rep_2012`|
 |`state_house_rep_2022`|
@@ -307,6 +313,8 @@ running ```uv run geocoder.py``` without the ```--config_path``` argument will d
 |`street_suffix`|
 |`traffic_district`|
 |`traffic_pm_district`|
+|`tobacco_free_school_zones`|
+|`tobacco_retailer_permit_capped`|
 |`unit_num`|
 |`unit_type`|
 |`us_congressional_2012`|
@@ -394,50 +402,17 @@ git push origin v1.0.0
 
 Publishing a new release will trigger the `build-and-publish` workflow, which calls the following command to create an executable file from the powershell script: `Invoke-ps2exe -inputFile $scriptFile -outputFile $outputExe -noConsole:$false`
 
-## 5. Matching Process
+#### 4.4 Publishing a Breaking Change
 
-```mermaid
-flowchart TB
-    A["Input Address"] --> B@{ label: "Is it a Philadelphia address? If unknown, assume it's Philadelphia." }
-    B -- Yes --> C["Match to address file"]
-    B -- No --> D["Match to TomTom"]
-    C -- Match --> E["Return geocoded address with enrichment fields"]
-    C -- No Match --> F["Is the address an intersection?"]
-    D -- Match --> G["Is it a Philadelphia address?"]
-    D -- No Match --> H["Return non-match"]
-    F -- Yes --> I["Get intersection latitude and longitude from AIS"]
-    F -- No --> J["Run AIS address match"]
-    I --> K["Get address through AIS reverse lookup"]
-    J -- Match --> E
-    J -- No Match --> D
-    K --> J
-    G -- Yes --> M["Rerun AIS Match"]
-    G -- No --> N["Return geocoded address, but no enrichment fields"]
-    M -- Match --> E
-    M -- No Match --> N
-    A@{ shape: manual-input}
-    B@{ shape: decision}
-    C@{ shape: process}
-    D@{ shape: process}
-    E@{ shape: terminal}
-    F@{ shape: decision}
-    G@{ shape: decision}
-    H@{ shape: terminal}
-    I@{ shape: process}
-    J@{ shape: process}
-    K@{ shape: process}
-    M@{ shape: process}
-    N@{ shape: terminal}
-    style B fill:#BBDEFB
-    style C fill:#FFE0B2
-    style D fill:#FFE0B2
-    style E fill:#C8E6C9
-    style F fill:#BBDEFB
-    style G fill:#BBDEFB
-    style H fill:#FFCDD2
-    style I fill:#FFE0B2
-    style J fill:#FFE0B2
-    style K fill:#FFE0B2
-    style M fill:#FFE0B2
-    style N fill:#FFF9C4
-```
+If your updates will cause previous installs of the geocoder to fail to work, (For example, a major change to how the powershell script interfaces with the backend), you will need to create a release as mentioned above and update `powershell/min_exe_version.txt` to match the version in the change. This will prevent the user from being able to run the executable if their version is older than the breaking change.
+
+To publish a breaking change:
+1. Update `powershell/min_exe_version.txt` to the latest semver number. The format is `v2.0.0`. In the future, we plan to remove the 'v' from the string.
+2. Update `powershell/geocoder_for_exe.ps1` so that `$exeVersion` variable matches the latest semver number
+3. Please flag in any PR that you have created a breaking change, and have a second person review.
+4. Once merged, create a release and push to main with the latest semver number
+
+The check works as follows:
+1. The exe should pull the most recent code on `main`, which will pull the latest copy of `min_exe_version.txt`.
+2. The exe will check the executable version in the file against `powershell/min_exe_version.txt`. **You must update the $exeVersion variable in the powershell file for this to work**. This check works by stripping the "v" from the semver string, and then using powershell's `[System.Version]` to compare versions.
+3. If the executable version is too low, the script will give the user an error and exit.

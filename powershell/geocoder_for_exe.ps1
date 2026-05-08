@@ -2,7 +2,7 @@
 #####
 
 # Get the directory of the currently executing script
-$ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path) 
+$ScriptDirectory = (Split-Path -Parent (Get-Process -Id $PID).Path)
 $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 
 # Paths needed for script
@@ -15,19 +15,12 @@ $addressFileGZ      = Join-Path $dataDirectory   'address_service_area_summary.c
 $addressFileCSV     = Join-Path $dataDirectory   'address_service_area_summary.csv'
 $addressFileParquet = Join-Path $dataDirectory   'address_service_area_summary.parquet'
 $addressVersionFile = Join-Path $dataDirectory   'address_file.etag'
-$zipPath            = Join-Path $ScriptDirectory 'address-geocoder.zip'
 $venvPath           = Join-Path $installFolder   '.venv'
-$venvPython         = Join-Path $venvPath        'Scripts\python.exe'
-$venvPip            = Join-Path $venvPath        'Scripts\pip.exe'
-$activatePs1        = Join-Path $venvPath        'Scripts\Activate.ps1'
+$venvPython         = Join-Path $venvPath 'Scripts\python.exe'
 $configYml          = Join-Path $ScriptDirectory   'config.yml'
 $configExample      = Join-Path $installFolder   'config_example.yml'
 $toParquetPy        = Join-Path $installFolder   'csv_to_parquet.py'
 $geocoderPy         = Join-Path $installFolder   'geocoder.py'
-
-# Paths needed for installation
-$wheelhouse    = Join-Path $ScriptDirectory 'wheelhouse'
-$requirements1 = Join-Path $installFolder   '.\requirements.txt'
 
 # GitHub Repo info
 $repoURL = 'https://github.com/CityOfPhiladelphia/address-geocoder.git'
@@ -36,7 +29,7 @@ $repo = "address-batch-geocoder"
 $branch = "origin/main"
 
 # Exe version, used to check if we need to force user to update
-$exeVersion = "v2.0.0"
+$exeVersion = "2.1.0"
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
@@ -62,7 +55,7 @@ function checkToolVersion {
         $minExeVersionFile = Join-Path $powershellDirectory 'min_exe_version.txt'
             if (Test-Path $minExeVersionFile) {
                 $minExeVersion = (Get-Content $minExeVersionFile -Raw).Trim()
-                if ($exeVersion -lt $minExeVersion) {
+                if ([System.Version]($exeVersion.TrimStart('v')) -lt [System.Version]($minExeVersion.TrimStart('v'))) {
                     Write-Host "This version of the tool is no longer supported." -ForegroundColor Red
                     Write-Host "Please download the latest version from:" -ForegroundColor Yellow
                     Write-Host "https://github.com/$owner/$repo/releases/latest" -ForegroundColor Cyan
@@ -127,50 +120,6 @@ function installGit {
     }
 }
 
-function installPython {
-    Write-Host "Checking for Python 3.11 on this machine..."
-
-    & py -3.11 --version > $null 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        $ver = py -3.11 --version
-        Write-Host "Python 3.11 is already available: $ver"
-        return
-    }
-
-    Write-Host "Python 3.11 not found. Attempting installation via winget (source 'winget')..."
-
-    $wingetArgs = @(
-        "install",
-        "-e",
-        "--id","Python.Python.3.11",
-        "--source","winget",
-        "--accept-source-agreements",
-        "--accept-package-agreements"
-    )
-
-    & winget @wingetArgs
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget failed to install Python 3.11 (exit code $LASTEXITCODE)." -ForegroundColor Red
-        Write-Host "You may need to install Python 3.11 manually from python.org, then re-run this script." -ForegroundColor Yellow
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-
-    # Refresh path after Python install
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-
-    & py -3.11 --version > $null 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "winget reported success, but 'py -3.11' is still not available." -ForegroundColor Red
-        Write-Host "Please install Python 3.11 manually, ensure 'py -3.11' works, then re-run this script." -ForegroundColor Yellow
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-
-    $ver2 = py -3.11 --version
-    Write-Host "Python 3.11 installation complete: $ver2"
-}
-
 function installUv {
     Write-Host "Checking for uv on this machine..."
     if (Get-Command uv -ErrorAction SilentlyContinue) {
@@ -203,38 +152,20 @@ function installUv {
 
 function createVenvAndConfig {
     Write-Host "Setting up virtual environment and packages..."
+
+    Push-Location $installFolder
+
+    & uv sync 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Package installation failed." -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+
+    Pop-Location
+        
+    Write-Host "Package installation complete!" -ForegroundColor Green
     
-    # Check if existing venv uses the wrong Python version and nuke it
-    if (Test-Path $venvPython) {
-        $venvVersion = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
-        if ($venvVersion -ne "3.11") {
-            Write-Host "Virtual environment is Python $venvVersion, expected 3.11. Recreating..." -ForegroundColor Yellow
-            Remove-Item -Recurse -Force $venvPath
-        }
-    }
-
-    # Create venv if it doesn't exist
-    if (-not (Test-Path $venvPath)) {
-        Write-Host "Creating virtual environment with Python 3.11..."
-        & uv venv $venvPath --python 3.11 2>&1 | ForEach-Object { Write-Host $_ }
-    } else {
-        Write-Host "Virtual environment already exists."
-    }
-
-    if (Test-Path $requirements1) {
-        Write-Host "Installing/updating packages..."
-        
-        # Use the venv's pip directly - avoids uv environment resolution issues
-        & uv pip install -r $requirements1 --python $venvPath 2>&1 | ForEach-Object { Write-Host $_ }
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "Package installation failed." -ForegroundColor Red
-            Read-Host "Press Enter to exit"
-            exit 1
-        }
-        
-        Write-Host "Package installation complete!" -ForegroundColor Green
-    }
 
     # Create config file if it doesn't exist
     if (-not (Test-Path -LiteralPath $configYml)) {
@@ -426,8 +357,10 @@ function downloadAddressFile {
     if (-Not (Test-Path $addressFileParquet) -or ($script:FileIsOutOfDate)) {   
         Write-Host "Converting address csv into a parquet file for speed and space optimization" -ForegroundColor Yellow
         
-        & $venvPython -u $toParquetPy --input_path $addressFileCSV --output_path $addressFileParquet
-        
+        Push-Location $installFolder
+        & uv run $toParquetPy --input_path $addressFileCSV --output_path $addressFileParquet
+        Pop-Location
+
         # Check if conversion failed
         if ($LASTEXITCODE -ne 0) {
             Write-Host "Failed to convert address file into the proper format." -ForegroundColor Red
@@ -459,7 +392,6 @@ $script:RepoWasUpdated = $false
 
 # Execute installation steps
 installGit
-installPython
 installUv
 cloneOrUpdate
 checkToolVersion  # Check version after cloning/updating repo
@@ -485,8 +417,14 @@ if ($script:RepoWasJustCloned) {
 switch ($runOption) {
     '1' {
        try {
-
+    
+    # Surround with quotes to avoid issues with filepaths with spaces in the name
     $appPy = Join-Path $installFolder 'app.py'  # adjust to your actual entrypoint
+    $appPy = '"' + $appPy + '"'
+
+    Write-Host "Python: $venvPython"
+    Write-Host "App: $appPy"
+    Write-Host "Working dir: $ScriptDirectory"
     $process = Start-Process -FilePath $venvPython `
                             -ArgumentList "-m", "streamlit", "run", $appPy `
                             -WorkingDirectory $ScriptDirectory `
@@ -513,6 +451,9 @@ finally {
     '2' {
         try {
     # Use Start-Process to allow interactive prompts
+    # Surround with quotes to avoid issues with filepaths with spaces in the name
+    $geocoderPy = '"' + $geocoderPy + '"'
+
     $process = Start-Process -FilePath $venvPython `
                              -ArgumentList $geocoderPy `
                              -WorkingDirectory $ScriptDirectory `
