@@ -604,12 +604,14 @@ class Geocoder:
             else record["raw_address"]
             )
         
+        # Fall back to raw address if no match but uppercase it
+        # to match passyunk parsed output
         tomtom_lookup_args = {
             "sess": self.session,
             "parser": self.parser,
             "philly_zips": ZIPS,
             "address": api_address,
-            "fallback_addr": record["output_address"],
+            "fallback_addr": record["raw_address"].upper(),
             "fetch_4326": self.srid_4326,
             "fetch_2272": self.srid_2272
         }
