@@ -5,7 +5,7 @@ import click
 import os
 import tempfile
 import csv
-import warnings
+import re
 from collections.abc import Generator
 from datetime import datetime
 from functools import partial
@@ -746,8 +746,18 @@ def run_process_csv(config_path):
     current_time = get_current_time()
     print(f"Beginning enrichment process at {current_time}.")
 
+    # Handle windows filepaths
+    # Yaml treats \ as an escape character
+    # So this breaks reading it. We need to replace with double \\
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+
+        cleaned = re.sub(
+            r'"([A-Za-z]:\\[^"]*)"',
+            lambda m: "'" + m.group(1) + "'",
+            f.read()
+            )
+        
+        config = yaml.safe_load(cleaned)
 
     geocoder = Geocoder(config)
     geocoder.geocode()
