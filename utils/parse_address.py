@@ -4,7 +4,7 @@ import usaddress
 import sys
 
 
-def infer_city_state_field(config) -> dict:
+def infer_city_state_field(address_fields) -> dict:
     """
     Args:
         config: The config object
@@ -12,18 +12,12 @@ def infer_city_state_field(config) -> dict:
     Returns dict: A dict mapping city and state fields to
     the field names in the user's input file
     """
-    full_addr = config.get("full_address_field")
+    full_addr = address_fields.get("full_address_field")
 
     if full_addr:
         return {"full_address": full_addr}
 
-    addr_fields = config.get("address_fields") or {}
-
-    return {
-        "city": addr_fields.get("city"),
-        "state": addr_fields.get("state"),
-        "zip": addr_fields.get("zip"),
-    }
+    return address_fields
 
 
 def tag_full_address(address: str):
@@ -64,6 +58,7 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
         Dict with 'is_non_philly' (bool) and 'is_undefined' (bool).
         is_undefined=True when we can't determine location with certainty.
     """
+    
     city = address_data.get("city")
     state = address_data.get("state")
     zip_code = address_data.get("zip")
@@ -104,45 +99,6 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
     else:
         return {"is_non_philly": True, "is_undefined": False}
 
-
-def is_non_philly_from_full_address(address: str, *, philly_zips: list) -> dict:
-    """
-    Helper function that allows the flag_non_philly_address
-    to be run as a mapped function within polars.
-
-    Args:
-        address (str)
-        philly_zips (list)
-
-    Returns:
-        dict: {'is_non_philly': bool, 'is_undefined': bool}
-    """
-    if address is None:
-        return {"is_non_philly": False, "is_undefined": True}
-
-    address_data = tag_full_address(address)
-
-    return flag_non_philly_address(address_data, philly_zips)
-
-
-def is_non_philly_from_split_address(
-    address_data: dict,
-    *,
-    zips: list,
-) -> bool:
-    """
-    Address_data: A row from a polars struct with keys
-    'city', 'state', 'zip'.
-
-    Zips are frozen with partial.
-
-    Returns dict with is_non_philly and is_undefined flags.
-    """
-    if address_data is None:
-        return {"is_non_philly": False, "is_undefined": True}
-
-    return flag_non_philly_address(address_data, zips)
-
 def is_non_philly(address: str | dict | None, address_is_split: bool, zips) -> dict:
     """Determines whether an address is in Philadelphia. Handles
     A string full address or a dict split address.
@@ -155,8 +111,7 @@ def is_non_philly(address: str | dict | None, address_is_split: bool, zips) -> d
     Returns:
         dict: {'is_non_philly': bool, 'is_undefined': bool}
     """
-
-    if address is None:
+    if not address:
         return {"is_non_philly": False, "is_undefined": True}
     
     # If address is in full address form, we need to tag it
@@ -222,7 +177,7 @@ def find_address_fields(config) -> dict[str]:
                 print("Exiting program...")
                 sys.exit()
     
-    if full_addr:
+    if full_addr and not resp:
         return {"full_address": full_addr}
     
     if not addr_fields.get("street_address"):
@@ -234,6 +189,7 @@ def find_address_fields(config) -> dict[str]:
 
     fields = {k: v for k, v in addr_fields.items() if v is not None}
     return fields
+
 
 
 def combine_fields(fields: list, record: dict):
@@ -276,9 +232,8 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
         is_addr = bool(has_street_code)
         is_philly_addr = bool(has_street_code)
 
-        output_address = (
-            parsed.get("output_address", address) if is_philly_addr else address
-        )
+        output_address = parsed.get("output_address", address)
+
     
     # Handle Passyunk parsing edge cases
     except Exception as e:
