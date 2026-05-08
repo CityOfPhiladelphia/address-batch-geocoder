@@ -64,7 +64,7 @@ def parse_with_passyunk_parser(
 
     lf = lf.with_columns(
         pl.col(address_col)
-        .map_elements(lambda s: parse_address(parser, s), return_dtype=new_cols)
+        .map_elements(lambda s: parse_address(parser, s), return_dtype=new_cols, skip_nulls=False)
         .alias("passyunk_struct")
     ).unnest("passyunk_struct")
 
@@ -364,7 +364,7 @@ class Geocoder:
             (philly_lf, non_philly_lf)
         """
 
-        fields = infer_city_state_field(self.config)
+        fields = infer_city_state_field(self.address_fields)
         full_address_field = fields.get("full_address")
 
         location_struct = pl.Struct(
@@ -380,7 +380,7 @@ class Geocoder:
         if full_address_field:
             flagged = lf.with_columns(
                 pl.col(full_address_field)
-                .map_elements(non_philly_fn, return_dtype=location_struct)
+                .map_elements(non_philly_fn, return_dtype=location_struct, skip_nulls=False)
                 .alias("location_info")
             ).unnest("location_info")
 
@@ -409,10 +409,10 @@ class Geocoder:
 
             flagged = lf.with_columns(
                 address_struct.map_elements(
-                    non_philly_fn, return_dtype=location_struct)
+                    non_philly_fn, return_dtype=location_struct, skip_nulls=False)
                 .alias("location_info")
             ).unnest("location_info")
-
+        
         return flagged.filter(~pl.col("is_non_philly")), \
             flagged.filter(pl.col("is_non_philly"))
 
@@ -567,10 +567,11 @@ class Geocoder:
     def _run_ais_lookup(self, record: dict) -> dict:
         api_address = (
             record["output_address"] + ", Philadelphia, PA"
-            if record.get("is_undefined")
+            if record.get("is_undefined") and record.get("output_address")
             else record["output_address"]
             )
-
+        
+        
         zip_field = self.address_fields.get("zip")
         full_address_field = self.address_fields.get("full_address")
 
@@ -599,7 +600,7 @@ class Geocoder:
 
         api_address = (
             record["raw_address"] + ", Philadelphia, PA"
-            if record.get("is_undefined")
+            if record.get("is_undefined") and record.get("raw_address")
             else record["raw_address"]
             )
         
