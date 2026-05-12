@@ -86,5 +86,5 @@ POSSIBLE_FIELDS = {
     "h3_hex_grid_r7": "h3_hex_grid_r7",
     "h3_hex_grid_r8": "h3_hex_grid_r8",
     "h3_hex_grid_r9": "h3_hex_grid_r9",
-    "h3_hex_grid_r10": "h3_hex_grid_r10"
+    "h3_hex_grid_r10": "h3_hex_grid_r10",
 }

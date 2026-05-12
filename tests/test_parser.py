@@ -14,13 +14,17 @@ p = PassyunkParser()
 parse = partial(parse_address, p)
 zips = ZIPS
 
+
 def test_falls_back_to_component_fields():
     config = {
         "full_address_field": None,
         "address_fields": {"street_address": "addr_st", "city": "addr_city"},
     }
 
-    assert find_address_fields(config) == {"street_address": "addr_st", "city": "addr_city"}
+    assert find_address_fields(config) == {
+        "street_address": "addr_st",
+        "city": "addr_city",
+    }
 
 
 def test_raises_if_street_missing():
@@ -28,7 +32,6 @@ def test_raises_if_street_missing():
         "full_address_field": None,
         "address_fields": {"city": "addr_city", "zip": "addr_zip"},
     }
-    
 
     with pytest.raises(ValueError, match="street_address"):
         find_address_fields(config)

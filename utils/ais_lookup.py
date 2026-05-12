@@ -10,17 +10,19 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
 
+
 @dataclass
 class AISResult:
-    output_address : str
-    is_addr : bool
-    is_philly_addr : bool
-    is_multiple_match : bool
-    geocoder_used : str = field(default=None)
-    geocode_lat : str = field(default=None)
-    geocode_lon : str = field(default=None)
-    geocode_x : str = field(default=None)
-    geocode_y : str = field(default=None)
+    output_address: str
+    is_addr: bool
+    is_philly_addr: bool
+    is_multiple_match: bool
+    geocoder_used: str = field(default=None)
+    geocode_lat: str = field(default=None)
+    geocode_lon: str = field(default=None)
+    geocode_x: str = field(default=None)
+    geocode_y: str = field(default=None)
+
 
 # ------- Helper Functions -------- #
 def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
@@ -60,7 +62,7 @@ def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
     if candidates:
         if strict:
             return candidates[0] if len(candidates) == 1 else None
-    
+
         else:
             return candidates[0]
 
@@ -85,16 +87,13 @@ def get_intersection_coords(ais_dict: dict) -> list[str, str]:
 
     return coords
 
+
 @retry(
     wait_exponential_multiplier=2000,
     wait_exponential_max=20000,
     stop_max_attempt_number=5,
 )
-def _lookup_service_area(
-        sess: requests.Session, 
-        lat: int, 
-        lon: int, 
-        api_key: str):
+def _lookup_service_area(sess: requests.Session, lat: int, lon: int, api_key: str):
     AIS_RATE_LIMITER.wait()
     ais_url = f"https://api.phila.gov/ais_doc/v1/service_areas/{lon},{lat}"
     params = {}
@@ -118,12 +117,9 @@ def _lookup_service_area(
             f"Error occurred with the following status code: {response.status_code}"
         )
 
+
 def fetch_service_area_enrichment_data(
-        sess: requests.Session,
-        api_key: str,
-        lat: str,
-        lon: str,
-        enrichment_fields: list
+    sess: requests.Session, api_key: str, lat: str, lon: str, enrichment_fields: list
 ) -> dict:
     """
     Looks up latitude and longitude against the AIS API service area endpoint,
@@ -134,24 +130,18 @@ def fetch_service_area_enrichment_data(
         lat: latitude
         lon: longitude
         enrichment_fields: which fields to return from AIS
-    
+
     Returns:
         (dict): A dictionary of enrichment data
     """
-    
-    result = _lookup_service_area(
-        sess,
-        lat,
-        lon,
-        api_key
-    )
+
+    result = _lookup_service_area(sess, lat, lon, api_key)
 
     if not result:
         return {}
 
     return {
-        field : result.get("service_areas", {}).get(field)
-        for field in enrichment_fields
+        field: result.get("service_areas", {}).get(field) for field in enrichment_fields
     }
 
 
@@ -160,7 +150,7 @@ def parse_address_lookup(resp: dict, zip: str, enrichment_fields: list) -> dict:
     Given an AIS address lookup response, tiebreak and get the street address
     and enrichment fields. Return as a dict.
 
-    Args: 
+    Args:
     resp (dict): A response from AIS
     enrichment_fields (list): A list of fields from the response to include
     """
@@ -169,11 +159,11 @@ def parse_address_lookup(resp: dict, zip: str, enrichment_fields: list) -> dict:
 
     if len(resp["features"]) > 1:
         matched_address = tiebreak(resp["features"], zip, strict=True)
-      
+
     # if json is not longer than 1, no need to tiebreak
     elif len(resp["features"]) == 1:
         matched_address = resp["features"][0]
-            
+
     # If tiebreak fails, return
     # null values for most fields.
     if not matched_address:
@@ -181,20 +171,31 @@ def parse_address_lookup(resp: dict, zip: str, enrichment_fields: list) -> dict:
 
     # If we successfully got a tiebroken_address, process it
 
-    out_address = matched_address.get("properties", "").get(
-    "street_address", ""
-    )
+    out_address = matched_address.get("properties", "").get("street_address", "")
 
     lon, lat = matched_address["geometry"]["coordinates"]
 
     enriched_fields = {
-        field : matched_address.get("properties", {}).get(field)
+        field: matched_address.get("properties", {}).get(field)
         for field in enrichment_fields
     }
 
-    return {"output_address": out_address, "lat": lat, "lon": lon, "enriched_fields": enriched_fields}
+    return {
+        "output_address": out_address,
+        "lat": lat,
+        "lon": lon,
+        "enriched_fields": enriched_fields,
+    }
 
-def parse_intersection_lookup(sess: requests.Session, api_key: str, resp: dict, original_address, zip: str, enrichment_fields: list) -> dict:
+
+def parse_intersection_lookup(
+    sess: requests.Session,
+    api_key: str,
+    resp: dict,
+    original_address,
+    zip: str,
+    enrichment_fields: list,
+) -> dict:
     features = resp.get("features")
 
     # Pick best feature
@@ -204,8 +205,10 @@ def parse_intersection_lookup(sess: requests.Session, api_key: str, resp: dict, 
 
     # Get service area data back for intersection
     lon, lat = feature["geometry"]["coordinates"]
-    
-    enriched_fields = fetch_service_area_enrichment_data(sess, api_key, lat, lon, enrichment_fields)
+
+    enriched_fields = fetch_service_area_enrichment_data(
+        sess, api_key, lat, lon, enrichment_fields
+    )
 
     # If tiebreak fails, return
     # null.
@@ -217,7 +220,13 @@ def parse_intersection_lookup(sess: requests.Session, api_key: str, resp: dict, 
     # if no city, state exists
     # We use original lat and lon here because its higher precision
     # than what the service area endpoint returns
-    return {"output_address": original_address, "lat": lat, "lon": lon, "enriched_fields" : enriched_fields}
+    return {
+        "output_address": original_address,
+        "lat": lat,
+        "lon": lon,
+        "enriched_fields": enriched_fields,
+    }
+
 
 def _round_coordinates(coord) -> str:
     """Round and stringify a coordinate value, returning None if invalid."""
@@ -226,12 +235,9 @@ def _round_coordinates(coord) -> str:
     except (TypeError, ValueError):
         return None
 
+
 def _fetch_ais_coordinates(
-        sess: requests.Session,
-        api_key: str,
-        address: str,
-        zip: str,
-        srid: int
+    sess: requests.Session, api_key: str, address: str, zip: str, srid: int
 ):
     """
     Fetches coordinates for a specific SRID. Returns (coord1, coord2) or
@@ -258,13 +264,14 @@ def _fetch_ais_coordinates(
                 feature = tiebreak(r_json["features"], zip)
                 if not feature:
                     return None, None
-                
+
             coord1, coord2 = feature["geometry"]["coordinates"]
             return str(coord1), str(coord2)
-            
+
         return None, None
-    
+
     return None, None
+
 
 @retry(
     wait_exponential_multiplier=1000,
@@ -307,10 +314,16 @@ def ais_lookup(
     if address:
         try:
             quoted_address = quote(address)
-            ais_url = "https://api.phila.gov/ais/v1/search/" + quoted_address + f"?gatekeeperKey={api_key}&srid=4326&max_range=0"
+            ais_url = (
+                "https://api.phila.gov/ais/v1/search/"
+                + quoted_address
+                + f"?gatekeeperKey={api_key}&srid=4326&max_range=0"
+            )
             response = sess.get(ais_url, verify=False)
         except:
-            print(f'Warning: AIS lookup failed for this address: {address}, {zip}, {original_address}')
+            print(
+                f"Warning: AIS lookup failed for this address: {address}, {zip}, {original_address}"
+            )
             response = None
     else:
         response = None
@@ -320,11 +333,16 @@ def ais_lookup(
     elif response and response.status_code == 429:
         raise Exception("429 response. Too many calls to the AIS API.")
 
-    
     # Initialize lat and lon values
-    lat, lon, = None, None 
+    (
+        lat,
+        lon,
+    ) = (
+        None,
+        None,
+    )
     geocode_lat, geocode_lon, geocode_x, geocode_y = None, None, None, None
-    
+
     # If status code is 200, that means API has found a match.
     # API will return a 404 if no match
     if response and response.status_code == 200:
@@ -339,18 +357,18 @@ def ais_lookup(
             parsed_response = parse_address_lookup(r_json, zip, enrichment_fields)
 
             if not parsed_response:
-            # If no match, return
-            # null values for most fields.
-            # Tiebreaking has failed in this case
-            # so is_multiple_match = True
+                # If no match, return
+                # null values for most fields.
+                # Tiebreaking has failed in this case
+                # so is_multiple_match = True
                 normalized_addr = r_json.get("normalized", "")
 
                 ais_result = AISResult(
-                    output_address = normalized_addr if normalized_addr else address,
-                    is_addr = False,
-                    is_philly_addr = True,
-                    is_multiple_match = True,
-                    geocoder_used = "ais-full-match"
+                    output_address=normalized_addr if normalized_addr else address,
+                    is_addr=False,
+                    is_philly_addr=True,
+                    is_multiple_match=True,
+                    geocoder_used="ais-full-match",
                 )
 
                 return asdict(ais_result)
@@ -358,20 +376,20 @@ def ais_lookup(
         # Intersection returns a different data structure with fewer
         # possible enrichment fields, so we need to handle this differently
         elif search_type == "intersection":
-            
+
             parsed_response = parse_intersection_lookup(
                 sess, api_key, r_json, original_address, zip, enrichment_fields
-                )
+            )
 
             # If tiebreak fails, return
             # null values for most fields.
             if not parsed_response:
                 ais_result = AISResult(
-                    output_address = original_address if original_address else address,
-                    is_addr = False,
-                    is_philly_addr = True,
-                    is_multiple_match = False,
-                    geocoder_used = "ais-intersection"
+                    output_address=original_address if original_address else address,
+                    is_addr=False,
+                    is_philly_addr=True,
+                    is_multiple_match=False,
+                    geocoder_used="ais-intersection",
                 )
 
                 return asdict(ais_result)
@@ -384,7 +402,7 @@ def ais_lookup(
         lon = parsed_response["lon"]
         out_address = parsed_response["output_address"]
 
-        if fetch_4326:   
+        if fetch_4326:
             # Don't need to make another lookup, we already have
             # coords from first lookup
             # get latitude and longitude from address search only
@@ -397,16 +415,18 @@ def ais_lookup(
 
         if fetch_2272:
             geo_x, geo_y = _fetch_ais_coordinates(sess, api_key, out_address, zip, 2272)
-            
+
             geocode_x = _round_coordinates(geo_x)
             geocode_y = _round_coordinates(geo_y)
-                
+
         ais_result = AISResult(
-            output_address = out_address if out_address else address,
-            is_addr = True if search_type == "address" else False,
-            is_philly_addr = True,
-            is_multiple_match = False,
-            geocoder_used = "ais-full-match" if search_type=="address" else "ais-intersection",
+            output_address=out_address if out_address else address,
+            is_addr=True if search_type == "address" else False,
+            is_philly_addr=True,
+            is_multiple_match=False,
+            geocoder_used=(
+                "ais-full-match" if search_type == "address" else "ais-intersection"
+            ),
             geocode_lat=geocode_lat,
             geocode_lon=geocode_lon,
             geocode_x=geocode_x,
@@ -418,10 +438,10 @@ def ais_lookup(
     # If no match, return none but preserve existing address validity flags
     # Use original_address if provided, otherwise fall back to address parameter
     ais_result = AISResult(
-        output_address = original_address if original_address else address,
-        is_addr = existing_is_addr,
-        is_philly_addr = existing_is_philly_addr,
-        is_multiple_match = False
+        output_address=original_address if original_address else address,
+        is_addr=existing_is_addr,
+        is_philly_addr=existing_is_philly_addr,
+        is_multiple_match=False,
     )
 
     return asdict(ais_result)
