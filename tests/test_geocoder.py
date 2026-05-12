@@ -23,11 +23,15 @@ def test_build_enrichment_fields_returns_fields_both_srids():
             "geocode_lat",
             "geocode_lon",
             "geocode_x",
-            "geocode_y"
+            "geocode_y",
         ],
     )
 
-    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
+    actual = build_enrichment_fields(
+        config.get("enrichment_fields", []),
+        config.get("srid_4326"),
+        config.get("srid_2272"),
+    )
 
     assert expected == actual
 
@@ -55,7 +59,11 @@ def test_build_enrichment_fields_returns_fields_only_4326():
         ],
     )
 
-    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
+    actual = build_enrichment_fields(
+        config.get("enrichment_fields", []),
+        config.get("srid_4326"),
+        config.get("srid_2272"),
+    )
 
     assert expected == actual
 
@@ -83,7 +91,11 @@ def test_build_enrichment_fields_returns_fields_only_2272():
         ],
     )
 
-    actual = build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
+    actual = build_enrichment_fields(
+        config.get("enrichment_fields", []),
+        config.get("srid_4326"),
+        config.get("srid_2272"),
+    )
 
     assert expected == actual
 
@@ -101,4 +113,8 @@ def test_build_enrichment_fields_errors_if_invalid_field():
     }
 
     with pytest.raises(ValueError):
-        build_enrichment_fields(config.get("enrichment_fields", []), config.get("srid_4326"), config.get("srid_2272"))
+        build_enrichment_fields(
+            config.get("enrichment_fields", []),
+            config.get("srid_4326"),
+            config.get("srid_2272"),
+        )
