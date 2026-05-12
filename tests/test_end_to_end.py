@@ -176,4 +176,4 @@ def test_ais_match(geocoded_output):
     for address in addresses:
         row = geocoded_output.filter(pl.col("street_address") == address)
         
-        assert row["geocoder_used"].item() == "ais"
+        assert row["geocoder_used"].item() == "ais-intersection"

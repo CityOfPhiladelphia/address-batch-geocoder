@@ -12,10 +12,13 @@ fields that the user supplies.
 1. Takes an input file of addresses, and standardizes those addresses using `passyunk`, Philadelphia's address standardization system.
 2. Compares the standardized data to a local parquet file, `addresses.parquet`, and adds the user-specified fields as well as latitude and longitude from that file
 3. Not all records will match to the address file. For those records that do not match, `Address-Batch-Geocoder` queries the Address Information System (AIS) API and adds returned fields. Please note that this process can take some time, so processing large files with a messy address field is not recommended. As an example, if you have a file that needs 1,000 rows to be sent to AIS, this will take approximately 3-4 minutes.
-4. Records that don't match to the AIS API are then queried against TomTom, which has different address parsing capabilities and is also able to return
-5. To reduce redundant API calls, the geocoder caches AIS and TomTom results for duplicate addresses within a single run.
-6. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
-7. The enriched file is then saved to the same directory as the input file.
+4. Records that don't match to the AIS API are then queried against TomTom, which has different address parsing capabilities and is also 
+able to return matches for non-Philadelphia addresses.
+5. Philadelphia-located records that match to Tom-Tom are then rematched against AIS, in order to recover the enrichment fields
+associated with those records.
+6. To reduce redundant API calls, the geocoder caches AIS and TomTom results for duplicate addresses within a single run.
+7. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
+8. The enriched file is then saved to the same directory as the input file.
 
 The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
 
@@ -141,8 +144,8 @@ address_fields:
 If you have both full_address_field and the address fields filled in, the script will ask you which to use.
 
 6. List which fields other than latitude and longitude you want to add.
-  (Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
-  A complete list of valid fields can be found further down in this README. 
+    (Latitude and longitude will always be added.) If you enter an invalid field, the program will error out and ask you to try again.
+    A complete list of valid fields can be found further down in this README. 
 
 ```
 enrichment_fields:
@@ -233,7 +236,25 @@ uv run geocoder.py --config_path=[PATH_TO_YOUR_CONFIG_FILE]
 ```
 running ```uv run geocoder.py``` without the ```--config_path``` argument will default to ```config.yml```
 
-## 3. Enrichment Fields
+## 3. Returned Data
+
+### 3.1 Returned Fields
+In addition to a set of optional enrichment fields (listed in the next section),
+the geocoder appends a set of fields to an input csv:
+
+| `Field Name` | `Description` |
+| --- | --- |
+| `output_address` | A parsed and formatted address.|
+| `is_addr` | True or False flag. Whether or not the input address matched to an address. False if no match, or if the input address is an intersection |
+| `is_philly_addr` | True or False flag. Whether or not the input address is in Philadelphia. |
+| `is_multiple_match` | True or False flag. Whether or not the input address initially matched to multiple addresses. |
+| `geocoder_used` | `address_file`: The address matched to the address file <br />`ais-full-match`: The address matched to an AIS address, with all possible fields returned <br />`ais-intersection`: The address matched to an intersection in AIS <br />`ais-service-area-match`: The address matched to an AIS address, with only service area fields returned <br />`tomtom-ais-full-match`: The address matched first to TomTom, but then was rematched to AIS, with all possible fields returned <br />`tomtom-ais-service-area-match`: The address matched first to TomTom, but then was rematched to AIS, with only service area fields returned. <br />`tomtom`: The address matched only to TomTom <br />`Null`: The address did not match. |
+| `geocode_lat` | The latitude, in EPSG 4326 |
+| `geocode_lon` | The longitude, in EPSG 4326 |
+| `geocode_x` | The x-coordinate, in EPSG 2272 |
+| `geocode_y` | The y-coordinate, in EPSG 2272 |
+
+### 3.2 Enrichment Fields
 
 | `Field` |
 | --- |
@@ -422,46 +443,69 @@ The check works as follows:
 
 ```mermaid
 flowchart TB
-    A["Input Address"] --> B@{ label: "Is it a Philadelphia address? If unknown, assume it's Philadelphia." }
-    B -- Yes --> C["Match to address file"]
-    B -- No --> D["Match to TomTom"]
+B["Is it a Philadelphia address? If unknown, assume it's Philadelphia."]
+
+ subgraph philly_path["**Philadelphia Addresses**"]
+        C["Match to address file"]
+        F["Is the address an intersection?"]
+        I["Get intersection latitude and longitude from AIS"]
+        J["Run AIS address match"]
+        K["Run AIS service area match with latitude and longitude"]
+  end
+ subgraph non_philly_path["**Addresses that don't match AIS**"]
+        D["Match to TomTom"]
+        G["Is it a Philadelphia address?"]
+        M["Rerun AIS address match"]
+        O["Run AIS service area match with latitude and longitude"]
+  end
+    A["Input Address"] --> B
+    B -- Yes --> C
+    C -- No Match --> F
+    F -- Yes --> I
+    F -- No --> J
+    I --> K
+    B -- No --> D
+    D -- Match --> G
+    G -- Yes --> M
     C -- Match --> E["Return geocoded address with enrichment fields"]
-    C -- No Match --> F["Is the address an intersection?"]
-    D -- Match --> G["Is it a Philadelphia address?"]
-    D -- No Match --> H["Return non-match"]
-    F -- Yes --> I["Get intersection latitude and longitude from AIS"]
-    F -- No --> J["Run AIS address match"]
-    I --> K["Get address through AIS reverse lookup"]
     J -- Match --> E
-    J -- No Match --> D
-    K --> J
-    G -- Yes --> M["Rerun AIS Match"]
-    G -- No --> N["Return geocoded address, but no enrichment fields"]
     M -- Match --> E
-    M -- No Match --> N
-    A@{ shape: manual-input}
-    B@{ shape: decision}
+    K -- Match --> P["Return geocoded address with some enrichment fields"]
+    K -- No Match --> N["Return geocoded address, but no enrichment fields"]
+    G -- No --> N
+    O -- Match --> P
+    O -- No Match --> N
+    D -- No Match --> H["Return non-match"]
+    M -- No Match --> O
+    J -- No Match --> D
+
     C@{ shape: process}
-    D@{ shape: process}
-    E@{ shape: terminal}
+    B@{ shape: decision}
     F@{ shape: decision}
-    G@{ shape: decision}
-    H@{ shape: terminal}
     I@{ shape: process}
     J@{ shape: process}
     K@{ shape: process}
+    D@{ shape: process}
+    G@{ shape: decision}
     M@{ shape: process}
+    O@{ shape: process}
+    A@{ shape: manual-input}
+    E@{ shape: terminal}
+    P@{ shape: terminal}
     N@{ shape: terminal}
-    style B fill:#BBDEFB
+    H@{ shape: terminal}
     style C fill:#FFE0B2
-    style D fill:#FFE0B2
-    style E fill:#C8E6C9
+    style B fill:#BBDEFB
     style F fill:#BBDEFB
-    style G fill:#BBDEFB
-    style H fill:#FFCDD2
     style I fill:#FFE0B2
     style J fill:#FFE0B2
     style K fill:#FFE0B2
+    style D fill:#FFE0B2
+    style G fill:#BBDEFB
     style M fill:#FFE0B2
+    style O fill:#FFE0B2
+    style E fill:#C8E6C9
+    style P fill:#FFF9C4
     style N fill:#FFF9C4
+    style H fill:#FFCDD2
 ```
