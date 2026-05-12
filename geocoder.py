@@ -17,7 +17,7 @@ from utils.parse_address import (
     infer_city_state_field,
     is_non_philly
 )
-from utils.ais_lookup import ais_lookup
+from utils.ais_lookup import ais_lookup, fetch_service_area_enrichment_data
 from utils.tomtom_lookup import tomtom_lookup
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
@@ -620,6 +620,27 @@ class Geocoder:
 
         return tomtom_result
 
+    def _run_service_area_lookup(self, record: dict):
+        if self.srid_4326:
+            lat = record["geocode_lat"]
+            lon = record["geocode_lon"]
+        
+        elif self.srid_2272:
+            lat = record["geocode_y"]
+            lon = record["geocode_x"]
+
+        else:
+            raise ValueError("At least one of the following must be specified: SRID 4326, SRID 2272")
+
+        service_area_result = fetch_service_area_enrichment_data(
+            self.session,
+            self.api_key,
+            lat,
+            lon,
+            self.ais_enrichment_fields)
+        
+        return service_area_result
+
     def _process_unmatched_address(self, record: dict) -> dict:
         """
         AIS -> TomTom -> Conditional AIS re-match for a single unmatched record.
@@ -676,11 +697,19 @@ class Geocoder:
             if self._is_matched(ais_rematch):
                 # AIS recovered the record - mark as tomtom-ais and use AIS result
                 record.update(ais_rematch)
-                record["geocoder_used"] = "tomtom-ais"
+                record["geocoder_used"] = "tomtom-ais-full-match"
+            
+            # If it doesn't match, attempt to get service area information
+            else:
+                ais_service_area_rematch = self._run_service_area_lookup(record)
+
+                if ais_service_area_rematch:
+                    record.update(ais_service_area_rematch)
+                    record["geocoder_used"] = "tomtom-ais-service-area-match"
+
             
             # else: AIS failed, keep TomTom result as-is
         
-
         # Now that we've processed the record, add it to the cache
         if addr:
             self.cache[addr] = record
