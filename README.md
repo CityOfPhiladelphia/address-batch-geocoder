@@ -445,14 +445,14 @@ The check works as follows:
 flowchart TB
 B["Is it a Philadelphia address? If unknown, assume it's Philadelphia."]
 
- subgraph philly_path["**Philadelphia Addresses**"]
+ subgraph philly_path["Philadelphia Addresses"]
         C["Match to address file"]
         F["Is the address an intersection?"]
         I["Get intersection latitude and longitude from AIS"]
         J["Run AIS address match"]
         K["Run AIS service area match with latitude and longitude"]
   end
- subgraph non_philly_path["**Addresses that don't match AIS**"]
+ subgraph non_philly_path["Addresses that don't match AIS"]
         D["Match to TomTom"]
         G["Is it a Philadelphia address?"]
         M["Rerun AIS address match"]
