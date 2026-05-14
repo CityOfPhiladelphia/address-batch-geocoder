@@ -31,7 +31,7 @@ You will need the following things:
 ## Installation
 First, you will need to download and install the geocoder.
 
-The geocoder file can be downloaded from GitHub. The latest release can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/
+The geocoder file can be downloaded from GitHub. The latest release and its documentation can be found at: https://github.com/CityOfPhiladelphia/address-geocoder/releases/latest
 
 Read through the notes carefully, and then download the zip file at the bottom of the readme. You may get a dangerous file blocked warning from Chrome. Override this block and download anyway.
 
