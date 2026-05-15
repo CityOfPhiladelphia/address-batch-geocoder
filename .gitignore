@@ -234,6 +234,7 @@ powershell/*.csv
 # Yaml files except example
 *.yml
 !config_example.yml
+!*.github/workflows/*.yml
 
 # Install directory
 address-geocoder-main/
