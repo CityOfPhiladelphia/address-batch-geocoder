@@ -20,6 +20,7 @@ dependencies = [
     "streamlit>=1.56.0",
     "usaddress>=0.5.16",
     "wheel>=0.46.2",
+    "zensical>=0.0.42",
 ]
 
 [tool.uv.sources]
