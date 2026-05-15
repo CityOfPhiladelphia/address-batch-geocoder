@@ -4,6 +4,10 @@ on:
     branches:
       - master
       - main
+
+  merge:
+    branches:
+      - main
   
     paths:
       - 'docs/**'
