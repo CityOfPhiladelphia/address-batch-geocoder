@@ -17,7 +17,7 @@ fields that the user supplies.
 6. Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in philly
 7. The enriched file is then saved to the same directory as the input file.
 
-The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file. The address file is published to s3 via airflow, using this DAG configuration: https://github.com/CityOfPhiladelphia/databridge-airflow-v2-configs/blob/main/citygeo/address_service_area_summary_public.yml.
+The release executable of the address geocoder automatically checks an s3 bucket for an updated version of the address file.
 
 ## Questions?
 If you have questions about the geocoder that this FAQ cannot answer, feel free to contact citygeo at: maps@phila.gov
