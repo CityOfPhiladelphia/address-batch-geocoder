@@ -45,7 +45,7 @@ As a first-time installation, the script will download Python and Git if not pre
 
 Note that this script will attempt to install Python 3.11 on your machine if you do not have Python 3.11 installed on your machine.
 
-The script will then attempt to download the address file. This may take a few minutes. It will save the address file and a version file in a subfolder called geocoder_address_data. Under most circumstances, you should not remove this folder or any of the files in it. Doing so will cause the script to redownload the address file.
+The script will then attempt to download the address file. The address file is the list of Philadelphia addresses that the tool makes the first-pass at matching against. This may take a few minutes. It will save the address file and a version file in a subfolder called geocoder_address_data. Under most circumstances, you should not remove this folder or any of the files in it. Doing so will cause the script to redownload the address file.
 
 After the installation runs successfully, you are ready to set up the configuration file.
 
