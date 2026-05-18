@@ -1,10 +1,15 @@
+---
+description: How to install the Address Batch Geocoder
+icon: lucide/arrow-down-to-line
+---
+
 # How to Install the Geocoder
 
 
 ## :lucide-arrow-down-to-line: Download
 First, you will need to download and install the geocoder. The Address Batch Geocoder can be downloaded here:
 
-[:lucide-arrow-down-to-line: Download the latest release from GitHub](https://github.com/CityOfPhiladelphia/address-batch-geocoder/releases/download/v2.1.1/geocoder-v2.1.1.zip){ .md-button .md-button--primary }
+[:lucide-arrow-down-to-line: Download the latest release from GitHub](https://github.com/CityOfPhiladelphia/address-batch-geocoder/releases/latest/download/geocoder.zip){ .md-button .md-button--primary }
 [:lucide-notepad-text: See the latest release notes](https://github.com/CityOfPhiladelphia/address-batch-geocoder/releases/latest){ .md-button }
 
 !!! tip "Tip: Blocked file"

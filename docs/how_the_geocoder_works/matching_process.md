@@ -1,3 +1,8 @@
+---
+description: An graphical overview of how the Geocoder works
+icon: lucide/network
+---
+
 # The Matching Process
 
 ```mermaid

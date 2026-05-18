@@ -1,3 +1,8 @@
+---
+description: Instructions on how to use the Python CLI for the Address Batch Geocoder
+icon: lucide/terminal
+---
+
 # Running a Python Command
 
 Note that this method is not currently recommended, as it requires more setup, and does not automatically check for address file updates, and requires the user to manually convert a downloaded address file to a parquet. If you choose to run the program this way, you should periodically repeat steps 3-5 below to keep the address file up to date.
