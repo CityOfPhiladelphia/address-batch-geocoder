@@ -4,6 +4,10 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.2.3)'
+        required: true
 
 jobs:
   build-and-publish:
@@ -29,7 +33,7 @@ jobs:
     - name: Save Release Info
       shell: pwsh
       run: |
-        $version = "${{ github.ref_name }}"
+        $version = "${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
         $version | Out-File -FilePath "release.txt" -Encoding UTF8 -NoNewline
         Write-Host "Created release.txt with version: $version"
     
@@ -43,6 +47,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
       with:
+        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
         files: geocoder.zip
         draft: false
         prerelease: false
