@@ -1,3 +1,8 @@
+---
+description: Instructions on how to use the yaml file config for the Address Batch Geocoder
+icon: lucide/file-text
+---
+
 # Yaml File Config
 
 After checking for updates, `geocoder.exe` will prompt the user with two run options:

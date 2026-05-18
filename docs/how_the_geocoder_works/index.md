@@ -1,3 +1,8 @@
+---
+description: An overview of how the Geocoder works
+---
+
+
 # How The Geocoder Works
 
 The geocoder processes a csv file with addresses, and geolocates those addresses using the following steps:

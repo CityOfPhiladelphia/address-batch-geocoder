@@ -1,3 +1,8 @@
+---
+description: A list of optional enrichment fields
+icon: lucide/map-plus
+---
+
 # Enrichment Fields
 
 | `Field` |

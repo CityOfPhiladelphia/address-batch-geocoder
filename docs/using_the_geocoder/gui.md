@@ -1,3 +1,8 @@
+---
+description: Instructions on how to use the Graphical User Interface for the Address Batch Geocoder
+icon: lucide/panels-top-left
+---
+
 # The Graphical User Interface (GUI)
 
 After checking for updates, `geocoder.exe` will prompt the user with two run options:
