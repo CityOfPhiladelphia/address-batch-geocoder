@@ -36,19 +36,16 @@ jobs:
     - name: Create Release ZIP
       shell: pwsh
       run: |
-        $version = "${{ github.ref_name }}"
-        $zipName = "geocoder-$version.zip"
-        Compress-Archive -Path geocoder.exe, release.txt -DestinationPath $zipName
-        Write-Host "Created $zipName"
+        Compress-Archive -Path geocoder.exe, release.txt -DestinationPath geocoder.zip
+        Write-Host "Created geocoder.zip"
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
-      if: github.ref_type == 'tag'
+      if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
       with:
         files: geocoder.zip
         draft: false
         prerelease: false
         generate_release_notes: true
-        body_path: powershell/RELEASE_NOTES.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
