@@ -33,9 +33,7 @@ site_author = "City of Philadelphia CityGeo"
 # fragment.
 #
 # Read more: https://zensical.org/docs/setup/basics/#copyright
-copyright = """
-Copyright &copy; 2026 The authors
-"""
+copyright = """Copyright &copy; 2026 City of Philadelphia"""
 
 # Zensical supports both implicit navigation and explicitly defined navigation.
 # If you decide not to define a navigation here then Zensical will simply
@@ -44,10 +42,29 @@ Copyright &copy; 2026 The authors
 # can be defined using TOML syntax.
 #
 # Read more: https://zensical.org/docs/setup/navigation/
-# nav = [
-#   { "Get started" = "index.md" },
-#   { "Markdown in 5min" = "markdown.md" },
-# ]
+
+nav = [
+  {"Home" = "index.md"},
+  {"Installation" = "installation.md"},
+  {"Using the Geocoder" = [
+     "using_the_geocoder/index.md",
+    {"Using the GUI" = "using_the_geocoder/gui.md"},
+    {"Using the YAML Config" = "using_the_geocoder/yaml_config.md"},
+    {"Using the Python CLI" = "using_the_geocoder/python_command.md"},
+    {"Enrichment Fields" = "using_the_geocoder/enrichment_fields.md"}
+  ]},
+  {"How the Geocoder Works" = [
+    "how_the_geocoder_works/index.md",
+    {"The Matching Process" = "how_the_geocoder_works/matching_process.md"}
+  ]},
+  {"Development" = [
+    "development/index.md",
+    {"Testing" = "development/testing.md"},
+    {"Updating The Powershell Script" = "development/updating_the_powershell_script.md"},
+    {"Publishing a Release" = "development/publishing_a_release.md"},
+    {"Publishing a Breaking Change" = "development/publishing_a_breaking_change.md"}
+  ]}
+]
 
 # With the "extra_css" option you can add your own CSS styling to customize
 # your Zensical project according to your needs. You can add any number of
