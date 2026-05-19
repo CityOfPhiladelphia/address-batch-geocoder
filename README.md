@@ -5,8 +5,9 @@ It also allows users to specify a list of optional enrichment fields to be retur
 
 ## Documentation
 Full documentation for the Address Batch Geocoder can be found here:
-[Documentation](https://cityofphiladelphia.github.io/address-batch-geocoder/)
+
+**https://cityofphiladelphia.github.io/address-batch-geocoder/**
 
 ## Questions?
-If you have questions about the geocoder, feel free to contact citygeo at: maps@phila.gov
+If you have questions about the geocoder, feel free to contact CityGeo at: maps@phila.gov
 
