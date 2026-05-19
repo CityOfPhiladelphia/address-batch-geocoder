@@ -28,7 +28,7 @@ Records that don't match to the AIS API are then queried against TomTom, which h
 To reduce redundant API calls, the geocoder caches AIS and TomTom results for duplicate addresses within a single run.
 
 ### :lucide-rotate-ccw: 6. Rematching
-Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in Philadelphia
+Records that successfully match to TomTom are then rerun against AIS to try to recover enrichment fields, if those addresses are in Philadelphia.
 
 ### :lucide-save: 7. Output
 The enriched file is then saved to the same directory as the input file.

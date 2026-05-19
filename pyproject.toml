@@ -9,6 +9,7 @@ dependencies = [
     "chardet>=5.2.0",
     "click>=8.1.8",
     "ipython>=8.18.1",
+    "mkdocstrings-python>=2.0.3",
     "passyunk",
     "polars>=1.34.0",
     "pyarrow>=14",

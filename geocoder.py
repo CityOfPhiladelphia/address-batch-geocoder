@@ -87,7 +87,8 @@ def build_enrichment_fields(
         srid_4326 (bool): Whether or not to append SRID 4326
         srid_2272 (bool): Whether or not to append SRID 2272
 
-    Returns: A tuple with AIS fieldnames and address file fieldnames.
+    Returns: 
+        A tuple with AIS fieldnames and address file fieldnames.
     """
     address_file_fields = []
 
@@ -142,8 +143,8 @@ def add_address_file_fields(
         srid_4326: Whether or not to append SRID 4326
         srid_2272: Whether or not to append SRID 2272
 
-        Returns:
-            The appended data and a dict of renamed fields if there were fieldname conflicts
+    Returns:
+        The appended data and a dict of renamed fields if there were fieldname conflicts
     """
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
@@ -216,6 +217,7 @@ class Geocoder:
     }
 
     def __init__(self, config: dict):
+        """Given a config, initialize the Geocoder object."""
         self.config: dict = config
         self.cache = LRUCache(max_size=20_000)
 
@@ -287,7 +289,8 @@ class Geocoder:
     # ------------ Functions Needed for Resume Functionality -------------- #
     def _count_output_rows(self) -> int:
         """Determines how many rows are in the output file. Needed to know
-        when to resume geocoding."""
+        when to resume geocoding.
+        """
         if not os.path.exists(self.out_path):
             return 0
         with open(self.out_path, "r", encoding="utf-8-sig") as f:
@@ -391,9 +394,6 @@ class Geocoder:
         Given a polars LazyFrame, splits into two lazy frames:
         One for addresses located in Philadelphia, one for addresses
         not located in Philadelphia.
-
-        Returns:
-            (philly_lf, non_philly_lf)
         """
 
         fields = infer_city_state_field(self.address_fields)
@@ -454,8 +454,13 @@ class Geocoder:
         )
 
     def _join_to_address_file(self, filepath: str | PurePath, sink_path: str) -> None:
-        """Parses, normalizes, and joins input CSV to local address file.
-        Sinks result to disk without loading full dataset into memory."""
+        """
+        Parses, normalizes, and joins input CSV to local address file.
+        Sinks result to disk without loading full dataset into memory.
+        
+        Returns:
+            None
+        """
         filepath = str(filepath)
 
         # Detect input file encoding and recode if necessary.
@@ -755,7 +760,18 @@ class Geocoder:
         return {k: v for k, v in record.items() if k not in self.INTERNAL_COLS}
 
     def geocode(self) -> None:
-        """Full pipeline: Join, save, iterate, write."""
+        """Runs the full geocoding pipeline on the configured input file.
+
+        Joins input addresses to the local address file via Polars lazy execution,
+        then iterates through unmatched records and attempts enrichment via AIS
+        and TomTom. Writes output incrementally to avoid memory pressure on large files.
+
+        If ``resume`` is set in the config, skips already-written rows and continues
+        from where the previous run left off.
+
+        Output is written to the same directory as the input file, with ``_enriched``
+        appended to the filename.
+        """
 
         sink_path = Path(self.out_path).with_suffix(".tmp")
         if sink_path.exists():
