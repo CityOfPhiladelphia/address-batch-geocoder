@@ -712,6 +712,7 @@ class Geocoder:
         if self._is_matched(record):
             if addr:
                 self.cache[addr] = record
+
             return record
 
         # ------------ TomTom Match --------------- #

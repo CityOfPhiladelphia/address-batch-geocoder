@@ -210,11 +210,6 @@ def parse_intersection_lookup(
         sess, api_key, lat, lon, enrichment_fields
     )
 
-    # If tiebreak fails, return
-    # null.
-    if not enriched_fields:
-        return {}
-
     # We use the original address here because the address that we use
     # to search against AIS may be augmented with PHILADELPHIA, PA
     # if no city, state exists
