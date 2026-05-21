@@ -14,7 +14,7 @@ Follow the instructions for your machine for installing uv here, if you have not
 
 ## Installing dependencies:
 1. Navigate to the package directory if not already there: `cd address-batch-geocoder`
-2. run `uv sync` to install the proper Python version and all package dependencies. This will create a virtual environment at `.venv`. If you intend to develop on the project, `run uv sync --group dev` or `uv sync --group dev --group docs` if you intend to contribute to the documents as well.
+2. run `uv sync --no-group dev` to install the proper Python version and all package dependencies. This will create a virtual environment at `.venv`. If you intend to develop on the project, `run uv sync --group dev` or `uv sync --all-groups` if you intend to contribute to the documents as well.
 3. Next, you will need to download the address file. This can be accessed via a public s3 bucket. It's best if you save this to a subfolder titled `address_geocoder_data`:
 ```
 mkdir address_geocoder_data
