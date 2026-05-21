@@ -2,8 +2,22 @@
 description: Who can work on the Geocoder
 ---
 
-
 # Working on the Geocoder
+## Development Install
+After cloning the repo, run:
+
+```
+uv sync --group dev
+```
+
+If you intend to update or test the project documentation, run:
+
+```
+uv sync --group dev --group docs
+```
+
+This will install the needed dependencies for development, including pytest.
+
 ## Who Can Contribute
 Only City of Philadelphia Employees working with CityGeo may merge Pull Requests.
 

@@ -22,7 +22,6 @@ def detect_file_encoding(file_path: str):
     return encoding
 
 
-
 def recode_to_utf8(src_path: str, dst_path: str, src_encoding: str) -> Path:
     """
     Reincode an input file to account for non-standard characters, line by line.

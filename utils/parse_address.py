@@ -58,7 +58,7 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
         Dict with 'is_non_philly' (bool) and 'is_undefined' (bool).
         is_undefined=True when we can't determine location with certainty.
     """
-    
+
     city = address_data.get("city")
     state = address_data.get("state")
     zip_code = address_data.get("zip")
@@ -99,25 +99,27 @@ def flag_non_philly_address(address_data: dict, philly_zips: list) -> dict:
     else:
         return {"is_non_philly": True, "is_undefined": False}
 
+
 def is_non_philly(address: str | dict | None, address_is_split: bool, zips) -> dict:
     """Determines whether an address is in Philadelphia. Handles
     A string full address or a dict split address.
-    
+
     Args:
         address (str | dict | None)
         address_is_split (bool): whether or not the address is the full address, or split
         zips: list of Philadelphia zip codes
-    
+
     Returns:
         dict: {'is_non_philly': bool, 'is_undefined': bool}
     """
     if not address:
         return {"is_non_philly": False, "is_undefined": True}
-    
+
     # If address is in full address form, we need to tag it
     address_data = address if address_is_split else tag_full_address(address)
 
     return flag_non_philly_address(address_data, zips)
+
 
 def find_address_fields(config) -> dict[str]:
     """
@@ -156,11 +158,11 @@ def find_address_fields(config) -> dict[str]:
 
     if full_addr and addr_fields:
         print(
-            "You have specified both a full address and separate"
+            "You have specified both a full address and separate\n"
             "address fields in the config file.\n"
             "Press 1 to use the full address.\n"
             "Press 2 to use the address fields.\n"
-             "Press or Q to quit.\n"
+            "Press or Q to quit.\n"
         )
 
         while resp.lower() not in ["1", "2", "q", "quit"]:
@@ -176,10 +178,10 @@ def find_address_fields(config) -> dict[str]:
             else:
                 print("Exiting program...")
                 sys.exit()
-    
+
     if full_addr and not resp:
         return {"full_address": full_addr}
-    
+
     if not addr_fields.get("street_address"):
         raise ValueError(
             "When full address field is not specified, "
@@ -189,7 +191,6 @@ def find_address_fields(config) -> dict[str]:
 
     fields = {k: v for k, v in addr_fields.items() if v is not None}
     return fields
-
 
 
 def combine_fields(fields: list, record: dict):
@@ -220,7 +221,7 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
     try:
         prsd = parser.parse(address)
         parsed = prsd["components"]
-    
+
         has_street_code = False
         for street in ("street", "street_2"):
             sc = parsed.get(street, {}).get("street_code")
@@ -234,7 +235,6 @@ def parse_address(parser, address: str) -> tuple[str, bool, bool]:
 
         output_address = parsed.get("output_address", address)
 
-    
     # Handle Passyunk parsing edge cases
     except Exception as e:
         output_address = address

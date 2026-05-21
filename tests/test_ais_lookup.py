@@ -27,7 +27,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         call_count["count"] += 1
         created["url"] = url
         created["params"] = params
-        
+
         # First call (SRID 4326)
         if call_count["count"] == 1:
             return FakeResponse(
@@ -90,7 +90,7 @@ def test_ais_lookup_creates_address_search_url(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "geocoder_used": "ais",
+        "geocoder_used": "ais-full-match",
         "is_multiple_match": False,
     }
 
@@ -152,7 +152,7 @@ def test_ais_lookup_only_fetches_4326(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "geocoder_used": "ais",
+        "geocoder_used": "ais-full-match",
         "is_multiple_match": False,
     }
 
@@ -176,7 +176,7 @@ def test_ais_lookup_only_fetches_2272(monkeypatch):
     def fake_get(self, url, params=None, timeout=None, **kwargs):
         call_count["count"] += 1
         created["url"] = url
-        
+
         # First call (initial lookup, always 4326)
         if call_count["count"] == 1:
             return FakeResponse(
@@ -231,7 +231,7 @@ def test_ais_lookup_only_fetches_2272(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 MARKET ST",
-        "geocoder_used": "ais",
+        "geocoder_used": "ais-full-match",
         "is_multiple_match": False,
     }
 
@@ -262,7 +262,7 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         call_count["count"] += 1
         created["url"] = url
         created["params"] = params
-        
+
         # First call (SRID 4326)
         if call_count["count"] == 1:
             return FakeResponse(
@@ -316,7 +316,10 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         fetch_2272=True,
     )
 
-    assert "1234%20mkt%20st" in created["url"] or "1234%20N%20MARKET%20ST" in created["url"]
+    assert (
+        "1234%20mkt%20st" in created["url"]
+        or "1234%20N%20MARKET%20ST" in created["url"]
+    )
     assert result == {
         "geocode_lat": "39.95",
         "geocode_lon": "-75.16",
@@ -325,7 +328,7 @@ def test_ais_lookup_tiebreaks(monkeypatch):
         "is_addr": True,
         "is_philly_addr": True,
         "output_address": "1234 N MARKET ST",
-        "geocoder_used": "ais",
+        "geocoder_used": "ais-full-match",
         "is_multiple_match": False,
     }
 
@@ -393,7 +396,10 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         fetch_2272=True,
     )
 
-    assert created["url"] == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
+    assert (
+        created["url"]
+        == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
+    )
     assert result == {
         "geocode_lat": None,
         "geocode_lon": None,
@@ -402,7 +408,7 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
         "is_addr": False,
         "is_philly_addr": True,
         "output_address": "1234 mkt st",
-        "geocoder_used": "ais",
+        "geocoder_used": "ais-full-match",
         "is_multiple_match": True,
     }
 
@@ -464,6 +470,7 @@ def test_false_address_returns_input_address_if_bad_address(monkeypatch):
         "geocoder_used": None,
     }
 
+
 def test_ais_lookup_handles_blank_address(monkeypatch):
     class FakeResponse:
         def __init__(self, data, status_code=404):
@@ -491,7 +498,6 @@ def test_ais_lookup_handles_blank_address(monkeypatch):
             },
             404,
         )
-    
 
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()

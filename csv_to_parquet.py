@@ -1,13 +1,10 @@
 import polars as pl
 import click
 
+
 @click.command()
-@click.option(
-    "--input_path"
-)
-@click.option(
-    "--output_path"
-)
+@click.option("--input_path")
+@click.option("--output_path")
 def convert_to_parquet(input_path, output_path):
 
     # Scan CSV into a lazy dataframe to avoid loading it all

@@ -62,7 +62,13 @@ nav = [
     {"Testing" = "development/testing.md"},
     {"Updating The Powershell Script" = "development/updating_the_powershell_script.md"},
     {"Publishing a Release" = "development/publishing_a_release.md"},
-    {"Publishing a Breaking Change" = "development/publishing_a_breaking_change.md"}
+    {"Publishing a Breaking Change" = "development/publishing_a_breaking_change.md"},
+
+    {"Reference" = [
+      "development/reference/index.md",
+      {"geocoder.py" = "development/reference/geocoder.md"},
+      {"utils" = "development/reference/utils.md"}
+    ]}
   ]}
 ]
 
@@ -82,7 +88,11 @@ nav = [
 # The path provided should be relative to the "docs_dir".
 #
 # Read more: https://zensical.org/docs/customization/#additional-javascript
-#extra_javascript = ["javascripts/extra.js"]
+
+extra_javascript = [
+    "https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js",
+    "javascripts/tablesort.js"
+]
 
 # ----------------------------------------------------------------------------
 # Section for configuring theme options
@@ -364,3 +374,17 @@ combine_header_slug = true
 [project.markdown_extensions.pymdownx.tasklist]
 custom_checkbox = true
 [project.markdown_extensions.pymdownx.tilde]
+
+
+# ----------------------------------------------------------------------------
+# Project Plugin Configurations
+# ----------------------------------------------------------------------------
+
+[project.plugins.mkdocstrings.handlers.python]
+inventories = ["https://docs.python.org/3/objects.inv"]
+paths = ["."]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+inherited_members = true
+#show_source = true

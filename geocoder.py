@@ -15,9 +15,9 @@ from utils.parse_address import (
     find_address_fields,
     parse_address,
     infer_city_state_field,
-    is_non_philly
+    is_non_philly,
 )
-from utils.ais_lookup import ais_lookup
+from utils.ais_lookup import ais_lookup, fetch_service_area_enrichment_data
 from utils.tomtom_lookup import tomtom_lookup
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
@@ -28,6 +28,7 @@ from pathlib import PurePath, Path
 def get_current_time():
     current_datetime = datetime.now()
     return current_datetime.strftime("%H:%M:%S")
+
 
 def parse_with_passyunk_parser(
     parser, address_col: str, lf: pl.LazyFrame
@@ -47,7 +48,7 @@ def parse_with_passyunk_parser(
     """
 
     # Create struct of columns to be filled by parse address function
-    
+
     # Use is_non_philly (not is_philly_addr) for routing — is_non_philly is set once
     # from the input address fields and is stable. is_philly_addr is an output field that is
     # an affirmative flag -- it is updated as matches are found, but during the intermediate
@@ -64,14 +65,18 @@ def parse_with_passyunk_parser(
 
     lf = lf.with_columns(
         pl.col(address_col)
-        .map_elements(lambda s: parse_address(parser, s), return_dtype=new_cols, skip_nulls=False)
+        .map_elements(
+            lambda s: parse_address(parser, s), return_dtype=new_cols, skip_nulls=False
+        )
         .alias("passyunk_struct")
     ).unnest("passyunk_struct")
 
     return lf
 
 
-def build_enrichment_fields(ais_enrichment_fields: list, srid_4326: bool, srid_2272: bool) -> tuple[list, list]:
+def build_enrichment_fields(
+    ais_enrichment_fields: list, srid_4326: bool, srid_2272: bool
+) -> tuple[list, list]:
     """
     Given a config dictionary, returns two lists of fields to be
     added to the input file. One list is the address file fieldnames,
@@ -80,9 +85,10 @@ def build_enrichment_fields(ais_enrichment_fields: list, srid_4326: bool, srid_2
     Args:
         ais_enrichment_fields (list): A list of fields to append
         srid_4326 (bool): Whether or not to append SRID 4326
-        srid_2272 (bool): Whether or not to append SRID 2272 
+        srid_2272 (bool): Whether or not to append SRID 2272
 
-    Returns: A tuple with AIS fieldnames and address file fieldnames.
+    Returns: 
+        A tuple with AIS fieldnames and address file fieldnames.
     """
     address_file_fields = []
 
@@ -116,8 +122,13 @@ def build_enrichment_fields(ais_enrichment_fields: list, srid_4326: bool, srid_2
     # Return empty   if no enrichment fields set
     return (ais_enrichment_fields if ais_enrichment_fields else [], address_file_fields)
 
+
 def add_address_file_fields(
-    geo_filepath: str, input_data: pl.LazyFrame, address_fields: list, srid_4326: bool, srid_2272: bool
+    geo_filepath: str,
+    input_data: pl.LazyFrame,
+    address_fields: list,
+    srid_4326: bool,
+    srid_2272: bool,
 ) -> tuple[pl.LazyFrame, dict]:
     """
     Given a list of address fields to add, adds those fields from
@@ -131,26 +142,30 @@ def add_address_file_fields(
         address_fields: A list of one or more address fields
         srid_4326: Whether or not to append SRID 4326
         srid_2272: Whether or not to append SRID 2272
-    
-        Returns:
-            The appended data and a dict of renamed fields if there were fieldname conflicts
+
+    Returns:
+        The appended data and a dict of renamed fields if there were fieldname conflicts
     """
     addresses = pl.scan_parquet(geo_filepath)
     addresses = addresses.select(address_fields)
 
     # Check which enrichment fields would conflict with existing columns
     existing_cols = input_data.collect_schema().names()
-    
+
     conflicts = [
-        key for key, value in POSSIBLE_FIELDS.items()
+        key
+        for key, value in POSSIBLE_FIELDS.items()
         if value in address_fields and value in existing_cols
     ]
 
     # Rename conflicting input columns to _left
     if conflicts:
-        rename_input = {POSSIBLE_FIELDS[field]: POSSIBLE_FIELDS[field] + "_left" for field in conflicts}
+        rename_input = {
+            POSSIBLE_FIELDS[field]: POSSIBLE_FIELDS[field] + "_left"
+            for field in conflicts
+        }
         input_data = input_data.rename(rename_input)
-    
+
     else:
         rename_input = {}
 
@@ -163,7 +178,7 @@ def add_address_file_fields(
     ).rename(rename_mapping)
 
     # Mark match type as address_file if we got coordinates from the file
-    # Check whichever SRID is enabled    
+    # Check whichever SRID is enabled
     if srid_4326:
         match_condition = pl.col("geocode_lat").is_not_null()
     elif srid_2272:
@@ -171,7 +186,7 @@ def add_address_file_fields(
     else:
         # This shouldn't happen due to earlier validation, but just in case
         raise ValueError("At least one SRID must be enabled")
-    
+
     joined_lf = joined_lf.with_columns(
         pl.when(match_condition)
         .then(pl.lit("address_file"))
@@ -181,9 +196,10 @@ def add_address_file_fields(
 
     return joined_lf, rename_input
 
+
 class Geocoder:
     """
-    Handles the full geocoding pipeline for a batch of addresses. 
+    Handles the full geocoding pipeline for a batch of addresses.
     Does so without loading full address file into memory.
 
     Pipeline:
@@ -191,10 +207,17 @@ class Geocoder:
         2. Iterate through sunk output, process unmatched records via AIS/TomTom APIs
         3. Write enriched records incrementally to output file
     """
-    
-    INTERNAL_COLS = {"__geocode_idx__", "joined_address", "is_non_philly", "is_undefined", "raw_address"}
+
+    INTERNAL_COLS = {
+        "__geocode_idx__",
+        "joined_address",
+        "is_non_philly",
+        "is_undefined",
+        "raw_address",
+    }
 
     def __init__(self, config: dict):
+        """Given a config, initialize the Geocoder object."""
         self.config: dict = config
         self.cache = LRUCache(max_size=20_000)
 
@@ -208,72 +231,75 @@ class Geocoder:
 
         # Raise errors if config file malformed
         if not self.api_key:
-            raise ValueError(
-                "AIS API Key must be specified."
-            )
-        
+            raise ValueError("AIS API Key must be specified.")
+
         if not self.input_filepath:
             raise ValueError("An input filepath must be specified in the config file.")
-        
+
         if not self.geo_filepath:
-            raise ValueError("A filepath for the address_file must be specified in the config.")
-        
+            raise ValueError(
+                "A filepath for the address_file must be specified in the config."
+            )
+
         self.parser: PassyunkParser = PassyunkParser()
         self.session: requests.Session = requests.Session()
 
         # Programmatically generate other attributes
         self.address_fields: dict = find_address_fields(config)
-        self.address_is_split: bool = False if self.address_fields.get("full_address") else True
+        self.address_is_split: bool = (
+            False if self.address_fields.get("full_address") else True
+        )
 
         in_path = PurePath(self.input_filepath)
-        stem = in_path.name.replace("".join(in_path.suffixes), "") 
+        stem = in_path.name.replace("".join(in_path.suffixes), "")
 
         self.out_path = str(in_path.parent / f"{stem}_enriched.csv")
 
         if self.config.get("resume"):
             prev_config = self._infer_previous_config()
-            self.__dict__.update(prev_config)  
-
+            self.__dict__.update(prev_config)
 
         if not self.srid_4326 and not self.srid_2272:
             raise ValueError(
                 "Invalid configuration: At least one SRID must be enabled. "
                 "Set srid_4326 or srid_2272 to true in your config file."
             )
-        
+
         # Determine which fields to append to the output
-        # If resuming, get them from the partially geocoded file  
+        # If resuming, get them from the partially geocoded file
         # If we're resuming, don't run so we don't override
         # the enrichment field values
-        if not self.config.get("resume"):           
-            self.ais_enrichment_fields, \
-            self.address_file_enrichment_fields \
-                = build_enrichment_fields(
+        if not self.config.get("resume"):
+            self.ais_enrichment_fields, self.address_file_enrichment_fields = (
+                build_enrichment_fields(
                     config.get("enrichment_fields", []),
                     srid_4326=self.srid_4326,
-                    srid_2272=self.srid_2272
+                    srid_2272=self.srid_2272,
                 )
-        
+            )
+
         # Programmatically calculate lines in file
         with open(self.input_filepath, "r") as f:
-            self.row_count = sum(1 for _ in f) - 1 # subtract header
-        
+            self.row_count = sum(1 for _ in f) - 1  # subtract header
+
         # Programmatically set batch size based on length of input file
         # To avoid writing too frequently for large files
         self.batch_size = max(1000, self.row_count // 100)
-    
+
     # ------------ Functions Needed for Resume Functionality -------------- #
     def _count_output_rows(self) -> int:
         """Determines how many rows are in the output file. Needed to know
-        when to resume geocoding."""
+        when to resume geocoding.
+        """
         if not os.path.exists(self.out_path):
             return 0
-        with open(self.out_path, 'r', encoding='utf-8-sig') as f:
-            return sum(1 for _ in f) - 1 # minus header
-    
+        with open(self.out_path, "r", encoding="utf-8-sig") as f:
+            return sum(1 for _ in f) - 1  # minus header
+
     def _infer_previous_config(self) -> None:
         """Determines the previous config for a partially geocoded file. Needed in order to determine
-        what geode format and enrichment fields should be used. Overwrites existing geocode format and address field specifications."""
+        what geode format and enrichment fields should be used. Overwrites existing geocode format and address field specifications.
+        """
 
         prev_config = {}
         if not os.path.exists(self.out_path):
@@ -281,68 +307,77 @@ class Geocoder:
                                     In order to resume geocoding {self.input_filepath}, 
                                     the following file must exist: {self.out_path}""")
 
-        with open(self.out_path, mode='r', encoding='utf-8-sig') as f:
+        with open(self.out_path, mode="r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             header = reader.fieldnames
-        
+
         # Determine geocode fields:
-        if 'geocode_lat' in header and 'geocode_lon' in header:
-            prev_config['srid_4326'] = True
+        if "geocode_lat" in header and "geocode_lon" in header:
+            prev_config["srid_4326"] = True
         else:
-            prev_config['srid_4326'] = False
-        
-        if 'geocode_x' in header and 'geocode_y' in header:
-            prev_config['srid_2272'] = True
+            prev_config["srid_4326"] = False
+
+        if "geocode_x" in header and "geocode_y" in header:
+            prev_config["srid_2272"] = True
         else:
-            prev_config['srid_2272'] = False
-        
+            prev_config["srid_2272"] = False
+
         if not (prev_config.get("srid_4326") or prev_config.get("srid_2272")):
-            raise ValueError("Partially coded file is missing geocoded fields, and cannot be resumed.")
+            raise ValueError(
+                "Partially coded file is missing geocoded fields, and cannot be resumed."
+            )
 
         # Identify enrichment fields
-        prev_config["ais_enrichment_fields"], \
-        prev_config["address_file_enrichment_fields"] = \
-        build_enrichment_fields(
+        (
+            prev_config["ais_enrichment_fields"],
+            prev_config["address_file_enrichment_fields"],
+        ) = build_enrichment_fields(
             [key for key in header if key in POSSIBLE_FIELDS.keys()],
-            prev_config['srid_4326'],
-            prev_config['srid_2272']
+            prev_config["srid_4326"],
+            prev_config["srid_2272"],
         )
 
         return prev_config
 
     def _read_from_tmp(self, tmp_path: str) -> Generator[dict, None, None]:
-        """Reads the sunk temp file after address file join 
+        """Reads the sunk temp file after address file join
         and produces a generator of the records in that file.
         Coerces boolean fields back from strings."""
-        
-        bool_fields = {"is_undefined", "is_non_philly", 
-                       "is_addr", "is_philly_addr", "is_multiple_match"}
-        
-        with open(tmp_path, mode='r', encoding='utf-8-sig') as f:
+
+        bool_fields = {
+            "is_undefined",
+            "is_non_philly",
+            "is_addr",
+            "is_philly_addr",
+            "is_multiple_match",
+        }
+
+        with open(tmp_path, mode="r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
 
-                yield {k: (v.lower() == "true") if k in bool_fields 
-                       else v for k, v in row.items()}
-    
+                yield {
+                    k: (v.lower() == "true") if k in bool_fields else v
+                    for k, v in row.items()
+                }
+
     def _write_batch(self, batch: list[dict], out_path: str) -> None:
         """Appends a batch of records to the output file."""
 
         if not batch:
             return
-        
+
         # If file doesn't exist, we need to write the header.
         write_header = not os.path.exists(out_path)
 
-        with open(out_path, 'a', newline='', encoding='utf-8-sig') as f:
-            fieldnames = [key for key in batch[0].keys() if key != '__geocode_idx__']
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+        with open(out_path, "a", newline="", encoding="utf-8-sig") as f:
+            fieldnames = [key for key in batch[0].keys() if key != "__geocode_idx__"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
 
             if write_header:
                 writer.writeheader()
             writer.writerows(batch)
             f.flush()
-
 
     def _is_matched(self, record: dict) -> bool:
         """Determines whether or not a record is geocoded, based on which
@@ -350,37 +385,38 @@ class Geocoder:
         if self.srid_4326:
             return bool(record.get("geocode_lat") and record.get("geocode_lon"))
         elif self.srid_2272:
-            return bool(record.get("geocode_x") and record.get("geocode_y")) 
-              
+            return bool(record.get("geocode_x") and record.get("geocode_y"))
+
         return False
-      
+
     def _split_non_philly(self, lf: pl.LazyFrame) -> tuple[pl.LazyFrame, pl.LazyFrame]:
         """
         Given a polars LazyFrame, splits into two lazy frames:
         One for addresses located in Philadelphia, one for addresses
         not located in Philadelphia.
-
-        Returns:
-            (philly_lf, non_philly_lf)
         """
 
         fields = infer_city_state_field(self.address_fields)
         full_address_field = fields.get("full_address")
 
         location_struct = pl.Struct(
-        [pl.Field("is_non_philly", pl.Boolean), 
-         pl.Field("is_undefined", pl.Boolean)]
+            [
+                pl.Field("is_non_philly", pl.Boolean),
+                pl.Field("is_undefined", pl.Boolean),
+            ]
         )
 
-        non_philly_fn = partial(is_non_philly, 
-                                address_is_split=self.address_is_split, 
-                                zips=ZIPS)
+        non_philly_fn = partial(
+            is_non_philly, address_is_split=self.address_is_split, zips=ZIPS
+        )
 
         # If we have the full address, just use the full address field
         if full_address_field:
             flagged = lf.with_columns(
                 pl.col(full_address_field)
-                .map_elements(non_philly_fn, return_dtype=location_struct, skip_nulls=False)
+                .map_elements(
+                    non_philly_fn, return_dtype=location_struct, skip_nulls=False
+                )
                 .alias("location_info")
             ).unnest("location_info")
 
@@ -395,12 +431,12 @@ class Geocoder:
             # are specified in the config, since city/state/zip are optional
             address_struct = pl.struct(
                 [
-                    (pl.col(city_col) if city_col else pl.lit(None, dtype=pl.Utf8)).alias(
-                        "city"
-                    ),
-                    (pl.col(state_col) if state_col else pl.lit(None, dtype=pl.Utf8)).alias(
-                        "state"
-                    ),
+                    (
+                        pl.col(city_col) if city_col else pl.lit(None, dtype=pl.Utf8)
+                    ).alias("city"),
+                    (
+                        pl.col(state_col) if state_col else pl.lit(None, dtype=pl.Utf8)
+                    ).alias("state"),
                     (pl.col(zip_col) if zip_col else pl.lit(None, dtype=pl.Utf8)).alias(
                         "zip"
                     ),
@@ -409,18 +445,24 @@ class Geocoder:
 
             flagged = lf.with_columns(
                 address_struct.map_elements(
-                    non_philly_fn, return_dtype=location_struct, skip_nulls=False)
-                .alias("location_info")
+                    non_philly_fn, return_dtype=location_struct, skip_nulls=False
+                ).alias("location_info")
             ).unnest("location_info")
-        
-        return flagged.filter(~pl.col("is_non_philly")), \
-            flagged.filter(pl.col("is_non_philly"))
+
+        return flagged.filter(~pl.col("is_non_philly")), flagged.filter(
+            pl.col("is_non_philly")
+        )
 
     def _join_to_address_file(self, filepath: str | PurePath, sink_path: str) -> None:
-        """Parses, normalizes, and joins input CSV to local address file.
-        Sinks result to disk without loading full dataset into memory."""
-        filepath = str(filepath)
+        """
+        Parses, normalizes, and joins input CSV to local address file.
+        Sinks result to disk without loading full dataset into memory.
         
+        Returns:
+            None
+        """
+        filepath = str(filepath)
+
         # Detect input file encoding and recode if necessary.
         # utf8_filepath is returned to the caller so they can clean it up
         # after the lazy frame has been materialized.
@@ -434,7 +476,7 @@ class Geocoder:
 
             recode_to_utf8(filepath, utf8_filepath, encoding)
             filepath = utf8_filepath
-        
+
         # infer schema = False infers everything as a string. Otherwise, polars
         # will attempt to infer zip codes like 19114-3409 as an int
         lf = pl.scan_csv(
@@ -454,7 +496,7 @@ class Geocoder:
                 "The following fields specified in the config "
                 f"file are not present in the input file: {diff}"
             )
-        
+
         # ---------------- Passyunk Parse and Format -------------------#
         passyunk_address_field = self.address_fields.get(
             "full_address"
@@ -475,61 +517,64 @@ class Geocoder:
             # Build list of available location components
             location_components = []
             for key in ["city", "state", "zip"]:
-                if key in self.address_fields.keys() \
-                    and self.address_fields[key] is not None:
+                if (
+                    key in self.address_fields.keys()
+                    and self.address_fields[key] is not None
+                ):
                     location_components.append(
                         pl.col(self.address_fields[key]).fill_null("")
-                )
-            
+                    )
+
             lf = lf.with_columns(
-            pl.when(pl.col("output_address").is_not_null())
-            .then(
+                pl.when(pl.col("output_address").is_not_null())
+                .then(
+                    pl.concat_str(
+                        [pl.col("output_address")] + location_components,
+                        separator=" ",
+                    )
+                    .str.replace_all(r"\s+", " ")
+                    .str.strip_chars()
+                )
+                .otherwise(pl.col(passyunk_address_field))
+                .alias("joined_address"),
                 pl.concat_str(
-                    [pl.col("output_address")] + location_components,
+                    [pl.col("raw_address")] + location_components,
                     separator=" ",
                 )
                 .str.replace_all(r"\s+", " ")
                 .str.strip_chars()
+                .alias("raw_address"),  # overwrite raw_address in place
             )
-            .otherwise(pl.col(passyunk_address_field))
-            .alias("joined_address"),
 
-            pl.concat_str(
-                [pl.col("raw_address")] + location_components,
-                separator=" ",
-            )
-            .str.replace_all(r"\s+", " ")
-            .str.strip_chars()
-            .alias("raw_address"),  # overwrite raw_address in place
-            )
-        
         else:
             # For full_address cases, use the original field as joined_address
             lf = lf.with_columns(pl.col(passyunk_address_field).alias("joined_address"))
-        
+
         # ---------------- Address File Join -------------------#
         # Split non-philly addresses before joining to address file.
         # This prevents non-Philly addresses from incorrectly matching
         # Philly records — e.g. "1234 Market St, Pittsburgh" would
         # otherwise match "1234 MARKET ST" in the Philly address file.
-        
+
         philly_lf, non_philly_lf = self._split_non_philly(lf)
 
         philly_joined_lf, input_renames = add_address_file_fields(
-            self.geo_filepath, philly_lf, 
-            self.address_file_enrichment_fields, 
+            self.geo_filepath,
+            philly_lf,
+            self.address_file_enrichment_fields,
             self.srid_4326,
-            self.srid_2272
-            )
+            self.srid_2272,
+        )
 
         # If we renamed any columns on philly_joined_lf, we need to do
         # the same on non_philly_lf before combining
         if input_renames:
             non_philly_lf = non_philly_lf.rename(input_renames)
-        
-        # Concat non-philly back in before sinking so output preserves row order
-        rejoined_lf = pl.concat([philly_joined_lf, non_philly_lf], how="diagonal").sort("__geocode_idx__")
 
+        # Concat non-philly back in before sinking so output preserves row order
+        rejoined_lf = pl.concat([philly_joined_lf, non_philly_lf], how="diagonal").sort(
+            "__geocode_idx__"
+        )
 
         # Reorder fields so that all geocode fields are adjacent
         final_cols = rejoined_lf.collect_schema().names()
@@ -538,24 +583,22 @@ class Geocoder:
         geo_cols = []
         if self.srid_4326:
             geo_cols.extend(["geocode_lat", "geocode_lon"])
-        
+
         if self.srid_2272:
             geo_cols.extend(["geocode_x", "geocode_y"])
 
         cols_without_geo = [c for c in final_cols if c not in geo_cols]
-        
+
         if "geocoder_used" in cols_without_geo:
             insert_idx = cols_without_geo.index("geocoder_used") + 1
         else:
             insert_idx = 0
-        
+
         # Insert all geocode columns together after geocoder_used
         ordered_cols = (
-            cols_without_geo[:insert_idx] + 
-            geo_cols + 
-            cols_without_geo[insert_idx:]
+            cols_without_geo[:insert_idx] + geo_cols + cols_without_geo[insert_idx:]
         )
-        
+
         rejoined_lf = rejoined_lf.select(ordered_cols)
 
         try:
@@ -569,9 +612,8 @@ class Geocoder:
             record["output_address"] + ", Philadelphia, PA"
             if record.get("is_undefined") and record.get("output_address")
             else record["output_address"]
-            )
-        
-        
+        )
+
         zip_field = self.address_fields.get("zip")
         full_address_field = self.address_fields.get("full_address")
 
@@ -585,7 +627,7 @@ class Geocoder:
             "existing_is_philly_addr": record["is_philly_addr"],
             "original_address": record["output_address"],
             "fetch_4326": self.srid_4326,
-            "fetch_2272": self.srid_2272
+            "fetch_2272": self.srid_2272,
         }
 
         # Include zip field if full address is not specified
@@ -595,15 +637,15 @@ class Geocoder:
         ais_result = ais_lookup(**ais_lookup_args)
 
         return ais_result
-        
+
     def _run_tomtom_lookup(self, record: dict) -> dict:
 
         api_address = (
             record["raw_address"] + ", Philadelphia, PA"
             if record.get("is_undefined") and record.get("raw_address")
             else record["raw_address"]
-            )
-        
+        )
+
         # Fall back to raw address if no match but uppercase it
         # to match passyunk parsed output
         tomtom_lookup_args = {
@@ -613,12 +655,32 @@ class Geocoder:
             "address": api_address,
             "fallback_addr": record["raw_address"].upper(),
             "fetch_4326": self.srid_4326,
-            "fetch_2272": self.srid_2272
+            "fetch_2272": self.srid_2272,
         }
-        
+
         tomtom_result = tomtom_lookup(**tomtom_lookup_args)
 
         return tomtom_result
+
+    def _run_service_area_lookup(self, record: dict):
+        if self.srid_4326:
+            lat = record["geocode_lat"]
+            lon = record["geocode_lon"]
+
+        elif self.srid_2272:
+            lat = record["geocode_y"]
+            lon = record["geocode_x"]
+
+        else:
+            raise ValueError(
+                "At least one of the following must be specified: SRID 4326, SRID 2272"
+            )
+
+        service_area_result = fetch_service_area_enrichment_data(
+            self.session, self.api_key, lat, lon, self.ais_enrichment_fields
+        )
+
+        return service_area_result
 
     def _process_unmatched_address(self, record: dict) -> dict:
         """
@@ -644,14 +706,15 @@ class Geocoder:
         # matching process, just because is_philly_addr is false doesn't mean it's actually not in philly
 
         # If it's likely the record is in philly
-        if not record.get('is_non_philly'):
+        if not record.get("is_non_philly"):
             record.update(self._run_ais_lookup(record))
-        
+
         if self._is_matched(record):
             if addr:
                 self.cache[addr] = record
+
             return record
-        
+
         # ------------ TomTom Match --------------- #
         # We need to use the raw input address to match against
         # TomTom, not the passyunk parsed address
@@ -666,7 +729,7 @@ class Geocoder:
             if addr:
                 self.cache[addr] = record
             return record
-        
+
         # ------------ AIS Rematch Attempt --------------- #
         # This time, we do use is_philly_addr, since TomTom may have
         # affirmatively marked an address in Philly
@@ -676,10 +739,17 @@ class Geocoder:
             if self._is_matched(ais_rematch):
                 # AIS recovered the record - mark as tomtom-ais and use AIS result
                 record.update(ais_rematch)
-                record["geocoder_used"] = "tomtom-ais"
-            
+                record["geocoder_used"] = "tomtom-ais-full-match"
+
+            # If it doesn't match, attempt to get service area information
+            else:
+                ais_service_area_rematch = self._run_service_area_lookup(record)
+
+                if ais_service_area_rematch:
+                    record.update(ais_service_area_rematch)
+                    record["geocoder_used"] = "tomtom-ais-service-area-match"
+
             # else: AIS failed, keep TomTom result as-is
-        
 
         # Now that we've processed the record, add it to the cache
         if addr:
@@ -691,7 +761,18 @@ class Geocoder:
         return {k: v for k, v in record.items() if k not in self.INTERNAL_COLS}
 
     def geocode(self) -> None:
-        """Full pipeline: Join, save, iterate, write."""
+        """Runs the full geocoding pipeline on the configured input file.
+
+        Joins input addresses to the local address file via Polars lazy execution,
+        then iterates through unmatched records and attempts enrichment via AIS
+        and TomTom. Writes output incrementally to avoid memory pressure on large files.
+
+        If ``resume`` is set in the config, skips already-written rows and continues
+        from where the previous run left off.
+
+        Output is written to the same directory as the input file, with ``_enriched``
+        appended to the filename.
+        """
 
         sink_path = Path(self.out_path).with_suffix(".tmp")
         if sink_path.exists():
@@ -705,18 +786,17 @@ class Geocoder:
         if not self.config.get("resume"):
             if os.path.exists(self.out_path):
                 os.remove(self.out_path)
-        
+
         # Get where we need to start writing
         # On resume, skip rows already written to output
         # Iterating and discarding is cheap since no API calls are made
-        resume_offset = self._count_output_rows() \
-            if self.config.get("resume") else 0
+        resume_offset = self._count_output_rows() if self.config.get("resume") else 0
 
         try:
             # Step 1: Join to the address file, then sink the results
             # as a tmp file
             self._join_to_address_file(self.input_filepath, sink_path)
-            
+
             # Step 2: Process records that didn't match to the address file
             # one by one
 
@@ -728,29 +808,30 @@ class Geocoder:
 
                 if self._is_matched(record):
                     batch.append(self._to_output_record(record))
-                
+
                 else:
                     batch.append(
-                        self._to_output_record(
-                            self._process_unmatched_address(record)))
-                
+                        self._to_output_record(self._process_unmatched_address(record))
+                    )
+
                 processed_rows += 1
 
                 if processed_rows % self.batch_size == 0:
                     self._write_batch(batch, self.out_path)
-                    
+
                     # Clear batch after it's written
                     batch = []
 
         finally:
             # Write any remaining rows
             if records is not None:
-                records.close() # Closes the records generator
+                records.close()  # Closes the records generator
 
             self._write_batch(batch, self.out_path)
 
             if os.path.exists(sink_path):
                 os.remove(sink_path)
+
 
 # Make a separate thin wrapper to pass config to
 # process_data, so we can run this script as both
@@ -773,20 +854,21 @@ def run_process_csv(config_path):
     with open(config_path, "r") as f:
 
         cleaned = re.sub(
-            r'"([A-Za-z]:\\[^"]*)"',
-            lambda m: "'" + m.group(1) + "'",
-            f.read()
-            )
-        
+            r'"([A-Za-z]:\\[^"]*)"', lambda m: "'" + m.group(1) + "'", f.read()
+        )
+
         config = yaml.safe_load(cleaned)
 
     geocoder = Geocoder(config)
     geocoder.geocode()
 
     # filepath lives here since the CLI is responsible for file I/O
-    
+
     current_time = get_current_time()
-    print(f"Enrichment complete at {current_time}. Output saved to {geocoder.out_path}.")
+    print(
+        f"Enrichment complete at {current_time}. Output saved to {geocoder.out_path}."
+    )
+
 
 if __name__ == "__main__":
     run_process_csv()

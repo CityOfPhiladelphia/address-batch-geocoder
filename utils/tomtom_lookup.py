@@ -6,10 +6,9 @@ from .ais_lookup import _round_coordinates
 
 TOMTOM_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
 
+
 def _fetch_tomtom_coordinates(
-    sess: requests.Session,
-    address: str,
-    srid: int
+    sess: requests.Session, address: str, srid: int
 ) -> tuple[str, str]:
     """
     Helper function to fetch coordinates for a specific SRID.
@@ -18,14 +17,14 @@ def _fetch_tomtom_coordinates(
     TOMTOM_RATE_LIMITER.wait()
     tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
     params = {"Address": address, "f": "pjson", "outSR": str(srid)}
-    
+
     response = sess.get(tomtom_url, params=params, timeout=10)
-    
+
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with TomTom API server.")
     elif response.status_code == 429:
         raise Exception("429 response. Too many API calls to TomTom.")
-    
+
     if response.status_code == 200 and response.json().get("candidates"):
         r_json = response.json()["candidates"][0]
         try:
@@ -34,8 +33,9 @@ def _fetch_tomtom_coordinates(
             return str(coord1), str(coord2)
         except KeyError:
             return None, None
-    
+
     return None, None
+
 
 def _do_tomtom_lookup(
     sess: requests.Session,
@@ -52,8 +52,8 @@ def _do_tomtom_lookup(
     """
 
     if not address:
-        return None 
-    
+        return None
+
     TOMTOM_RATE_LIMITER.wait()
     tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
     params = {"Address": address, "f": "pjson", "outSR": "4326"}
@@ -72,10 +72,16 @@ def _do_tomtom_lookup(
         address_flagged = flag_non_philly_address(address_tagged, philly_zips)
         is_philly_addr = not address_flagged["is_non_philly"]
 
-        parsed_address = parser.parse(matched_address).get("components", "").get("output_address", "")
+        parsed_address = (
+            parser.parse(matched_address)
+            .get("components", "")
+            .get("output_address", "")
+        )
 
         out_data = {}
-        out_data["output_address"] = parsed_address if parsed_address else matched_address
+        out_data["output_address"] = (
+            parsed_address if parsed_address else matched_address
+        )
         out_data["geocoder_used"] = geocoder_used
         out_data["is_addr"] = True
         out_data["is_philly_addr"] = is_philly_addr
@@ -89,7 +95,7 @@ def _do_tomtom_lookup(
 
             except KeyError:
                 out_data["geocode_lat"] = None
-                out_data["geocode_lon"] = None            
+                out_data["geocode_lon"] = None
 
         if fetch_2272:
             geo_x, geo_y = _fetch_tomtom_coordinates(sess, matched_address, 2272)
@@ -100,6 +106,7 @@ def _do_tomtom_lookup(
 
     return None
 
+
 # Code adapted from Alex Waldman and Roland MacDavid
 # https://github.com/CityOfPhiladelphia/databridge-etl-tools/blob/master/databridge_etl_tools/ais_geocoder/ais_request.py
 @retry(
@@ -108,10 +115,10 @@ def _do_tomtom_lookup(
     stop_max_attempt_number=5,
 )
 def tomtom_lookup(
-    sess: requests.Session, 
-    parser, 
-    philly_zips: list, 
-    address: str, 
+    sess: requests.Session,
+    parser,
+    philly_zips: list,
+    address: str,
     fallback_addr,
     fetch_4326: bool = True,
     fetch_2272: bool = True,
@@ -133,8 +140,10 @@ def tomtom_lookup(
         A dict with standardized address, latitude and longitude, returned
         from TomTom.
     """
-    out_data = _do_tomtom_lookup(sess, parser, philly_zips, address, fetch_4326, fetch_2272)
-    
+    out_data = _do_tomtom_lookup(
+        sess, parser, philly_zips, address, fetch_4326, fetch_2272
+    )
+
     if out_data is not None:
         return out_data
 
@@ -149,9 +158,9 @@ def tomtom_lookup(
     if fetch_4326:
         out_data["geocode_lat"] = None
         out_data["geocode_lon"] = None
-    
+
     if fetch_2272:
         out_data["geocode_x"] = None
         out_data["geocode_y"] = None
-    
+
     return out_data

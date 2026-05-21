@@ -69,9 +69,11 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
     def fake_get(self, url, params=None, timeout=None, **kwargs):
         call_count["count"] += 1
         if call_count["count"] == 1:
-            return FakeResponse(json_response_match, 200)       # initial lookup
+            return FakeResponse(json_response_match, 200)  # initial lookup
         elif call_count["count"] == 2:
-            return FakeResponse(json_response_match_2272, 200)  # _fetch_tomtom_coordinates 2272
+            return FakeResponse(
+                json_response_match_2272, 200
+            )  # _fetch_tomtom_coordinates 2272
         else:
             raise AssertionError(f"Unexpected call #{call_count['count']}")
 
@@ -79,8 +81,13 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
     sess = FakeSession()
 
     result = tomtom_lookup.tomtom_lookup(
-        sess, p, ["19107"], "1234 Market St", "1234 MARKET ST",
-        fetch_4326=True, fetch_2272=True
+        sess,
+        p,
+        ["19107"],
+        "1234 Market St",
+        "1234 MARKET ST",
+        fetch_4326=True,
+        fetch_2272=True,
     )
 
     assert result == {
@@ -93,6 +100,7 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
         "output_address": "1234 MARKET ST",
         "geocoder_used": "tomtom",
     }
+
 
 def test_tomtom_lookup_only_fetches_4326(monkeypatch):
     class FakeResponse:
@@ -114,8 +122,13 @@ def test_tomtom_lookup_only_fetches_4326(monkeypatch):
     sess = FakeSession()
 
     result = tomtom_lookup.tomtom_lookup(
-        sess, p, ["19107"], "1234 Market St", "1234 MARKET ST",
-        fetch_4326=True, fetch_2272=False
+        sess,
+        p,
+        ["19107"],
+        "1234 Market St",
+        "1234 MARKET ST",
+        fetch_4326=True,
+        fetch_2272=False,
     )
 
     assert result == {
@@ -159,8 +172,13 @@ def test_tomtom_lookup_only_fetches_2272(monkeypatch):
     sess = FakeSession()
 
     result = tomtom_lookup.tomtom_lookup(
-        sess, p, ["19107"], "1234 Market St", "1234 MARKET ST",
-        fetch_4326=False, fetch_2272=True
+        sess,
+        p,
+        ["19107"],
+        "1234 Market St",
+        "1234 MARKET ST",
+        fetch_4326=False,
+        fetch_2272=True,
     )
 
     assert result == {
@@ -202,8 +220,13 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     sess = FakeSession()
 
     result = tomtom_lookup.tomtom_lookup(
-        sess, p, ["1111"], "1234 Fake St", "1234 FAKE ST",
-        fetch_4326=True, fetch_2272=True
+        sess,
+        p,
+        ["1111"],
+        "1234 Fake St",
+        "1234 FAKE ST",
+        fetch_4326=True,
+        fetch_2272=True,
     )
 
     assert result == {
@@ -237,37 +260,51 @@ def test_tomtom_lookup_handles_non_philly_address(monkeypatch):
         call_count["count"] += 1
         # Return the NJ address (second candidate)
         if call_count["count"] == 1:
-            return FakeResponse({
-                "spatialReference": {"wkid": 4326, "latestWkid": 4326},
-                "candidates": [
-                    {
-                        "address": "1234 Market St, Gloucester City, New Jersey, 08030",
-                        "location": {"x": -75.11192847164241, "y": 39.88775918851947},
-                        "score": 100,
-                        "attributes": {},
-                    }
-                ],
-            }, 200)
-            
+            return FakeResponse(
+                {
+                    "spatialReference": {"wkid": 4326, "latestWkid": 4326},
+                    "candidates": [
+                        {
+                            "address": "1234 Market St, Gloucester City, New Jersey, 08030",
+                            "location": {
+                                "x": -75.11192847164241,
+                                "y": 39.88775918851947,
+                            },
+                            "score": 100,
+                            "attributes": {},
+                        }
+                    ],
+                },
+                200,
+            )
+
         else:
-            return FakeResponse({
-                "spatialReference": {"wkid": 2272, "latestWkid": 2272},
-                "candidates": [
-                    {
-                        "address": "1234 Market St, Gloucester City, New Jersey, 08030",
-                        "location": {"x": 2700000.00, "y": 240000.00},
-                        "score": 100,
-                        "attributes": {},
-                    }
-                ],
-            }, 200)
+            return FakeResponse(
+                {
+                    "spatialReference": {"wkid": 2272, "latestWkid": 2272},
+                    "candidates": [
+                        {
+                            "address": "1234 Market St, Gloucester City, New Jersey, 08030",
+                            "location": {"x": 2700000.00, "y": 240000.00},
+                            "score": 100,
+                            "attributes": {},
+                        }
+                    ],
+                },
+                200,
+            )
 
     monkeypatch.setattr(FakeSession, "get", fake_get)
     sess = FakeSession()
 
     result = tomtom_lookup.tomtom_lookup(
-        sess, p, ["19107"], "1234 Market St", "1234 MARKET ST",
-        fetch_4326=True, fetch_2272=True
+        sess,
+        p,
+        ["19107"],
+        "1234 Market St",
+        "1234 MARKET ST",
+        fetch_4326=True,
+        fetch_2272=True,
     )
 
     assert result["is_addr"] == True
