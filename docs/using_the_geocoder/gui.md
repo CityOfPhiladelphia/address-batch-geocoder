@@ -19,7 +19,7 @@ Press `1` to use the user interface. A window will open up in your default brows
 ### **Choose a run type**
 You have the option to geocode a new file, or resume a partially geocoded file. Because geocoding may take a while, the option to resume a file exists to continue files that may have been partially geocoded and interrupted.
 
-![image-20260505100402609](/static/run_type_select.png)
+![Select a run type](/static/run_type_select.png)
 
 ### Configuring your run
 === "Geocoding a New File"
@@ -43,41 +43,41 @@ You have the option to geocode a new file, or resume a partially geocoded file. 
 
     2. The Input File field. Paste in the full file path of the file that you wish to enrich. You can do this by finding the file in your file explorer, right clicking it, and selecting 'Copy as path', and then pasting the result in the input field.
 
-        ![image-20260505102221872](/static/copy_as_path.png)
+        ![How to copy a file path](/static/copy_as_path.png)
 
     ### 3. Load and preview your file
     Once you have entered the API key and the input file, click the "Load file" button. This will render a preview of the file.
 
-    ![image-20260505102626265](/static/preview.png)
+    ![Input File Preview](/static/preview.png)
 
     ### 4. Map your address fields
     Next, map your address fields:
 
     You can map a single address field (if all address information on your input file is on the same line)
 
-    ![image-20260505102719761](/static/single_address_field.png)
+    ![Single address field](/static/single_address_field.png)
 
     Or you can map separate address / city / state/ zip fields
 
-    ![image-20260505102836656](/static/separate_address_fields.png)
+    ![Separate address fields](/static/separate_address_fields.png)
 
     ### 5. Select enrichment fields (new files only)
     If you are starting a new file, select which enrichment fields you want to add:
 
     Choose which SRIDs you would like to geocode for. You have an option between WGS 84 (4326), the Pennsylvania State Plane (2272), or both.
 
-    ![image-20260505103045985](/static/srid_select.png)
+    ![Select an SRID](/static/srid_select.png)
 
     Select which additional optional enrichment fields you wish to add to your data. There are around 80 to choose from. You can use the selection widget to search for options if you don't wish to scroll through everything.
 
-    ![image-20260505103136307](/static/enrichment_field_select.png)
+    ![Enrichment field select](/static/enrichment_field_select.png)
 
     This option will not appear if you are resuming a partially geocoded file, because the enrichment fields must match what is in the partially geocoded file.
 
     ### 6. Geocode and retrieve results
     Once the required fields are entered, a geocode button will appear. You can geocode the file.
 
-    ![image-20260505103230160](/static/geocode_button.png)
+    ![Geocode button](/static/geocode_button.png)
 
     **Do not close the browser** while geocoding is in progress &mdash; you will be unable to download your results. 
 
@@ -85,7 +85,7 @@ You have the option to geocode a new file, or resume a partially geocoded file. 
 
     To close the geocoder, you will need to close both the browser window and the terminal window running geocoder.exe.
 
-    ![image-20260505105021763](/static/geocoding_complete.png)
+    ![Geocoding complete message](/static/geocoding_complete.png)
 
     ### 7. Saving your config for later
 
@@ -105,13 +105,13 @@ You have the option to geocode a new file, or resume a partially geocoded file. 
         
             The input file should still be the file path of the original input file you used to geocode, not the partially geocoded file. Keep in mind, that **the partially geocoded file must also exist in the same folder as the input file for this to work.**
 
-        ![image-20260505102221872](/static/copy_as_path.png)
+        ![How to copy a file path](/static/copy_as_path.png)
 
 
     ### 2. Load and preview your file
     Once you have entered the API key and the input file, click the "Load file" button. This will render a preview of the file.
 
-    ![image-20260505102626265](/static/preview.png)
+    ![Input File Preview](/static/preview.png)
 
     ### 3. Map your address fields
     Next, map your address fields.
@@ -121,16 +121,16 @@ You have the option to geocode a new file, or resume a partially geocoded file. 
 
     You can map a single address field (if all address information on your input file is on the same line)
 
-    ![image-20260505102719761](/static/single_address_field.png)
+    ![Single address field](/static/single_address_field.png)
 
     Or you can map separate address / city / state/ zip fields
 
-    ![image-20260505102836656](/static/separate_address_fields.png)
+    ![Separate address fields](/static/separate_address_fields.png)
 
     ### 4. Geocode and retrieve results
     Once the required fields are entered, a geocode button will appear. You can geocode the file.
 
-    ![image-20260505103230160](/static/geocode_button.png)
+    ![Geocode button](/static/geocode_button.png)
 
     **Do not close the browser** while geocoding is in progress &mdash; you will be unable to download your results. 
 
@@ -138,7 +138,7 @@ You have the option to geocode a new file, or resume a partially geocoded file. 
 
     To close the geocoder, you will need to close both the browser window and the terminal window running geocoder.exe.
 
-    ![image-20260505105021763](/static/geocoding_complete.png)
+    ![Geocoding complete message](/static/geocoding_complete.png)
 
     ### 5. Saving your config for later
 
