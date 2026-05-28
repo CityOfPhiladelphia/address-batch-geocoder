@@ -23,7 +23,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.5"
+          version: "latest"
       - name: Install project
         run: uv sync
       - name: Run tests
