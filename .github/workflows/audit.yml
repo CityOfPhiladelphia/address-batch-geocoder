@@ -1,0 +1,32 @@
+name: Security Audit
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - 'uv.lock'
+            - 'pyproject.toml'
+    
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    audit:
+        runs-on: ubuntu-latest
+        permissions:
+          contents: read
+          
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
+            
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+              with:
+                version: "latest"
+
+            - name: Audit dependencies
+              run: uv audit
