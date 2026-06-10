@@ -398,7 +398,7 @@ def test_ais_lookup_returns_no_match_if_tiebreak_fails(monkeypatch):
 
     assert (
         created["url"]
-        == "https://api.phila.gov/ais/v1/search/1234%20mkt%20st?gatekeeperKey=1234&srid=4326&max_range=0"
+        == "https://api-prod.phila.gov/ais/v1/search/1234%20mkt%20st"
     )
     assert result == {
         "geocode_lat": None,

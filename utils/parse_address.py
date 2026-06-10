@@ -1,4 +1,3 @@
-import yaml
 import re
 import usaddress
 import sys
@@ -162,7 +161,7 @@ def find_address_fields(config) -> dict[str]:
             "address fields in the config file.\n"
             "Press 1 to use the full address.\n"
             "Press 2 to use the address fields.\n"
-            "Press or Q to quit.\n"
+            "Press any other key to quit.\n"
         )
 
         while resp.lower() not in ["1", "2", "q", "quit"]:

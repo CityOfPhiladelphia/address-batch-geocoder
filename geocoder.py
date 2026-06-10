@@ -17,7 +17,7 @@ from utils.parse_address import (
     infer_city_state_field,
     is_non_philly,
 )
-from utils.ais_lookup import ais_lookup, fetch_service_area_enrichment_data
+from utils.ais_lookup import ais_lookup, fetch_service_area_enrichment_data, validate_api_key
 from utils.tomtom_lookup import tomtom_lookup
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
@@ -773,6 +773,9 @@ class Geocoder:
         Output is written to the same directory as the input file, with ``_enriched``
         appended to the filename.
         """
+
+        # Validate that the given API key works
+        validate_api_key(self.session, self.api_key)
 
         sink_path = Path(self.out_path).with_suffix(".tmp")
         if sink_path.exists():
