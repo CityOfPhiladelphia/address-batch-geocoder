@@ -18,7 +18,7 @@ from utils.parse_address import (
     is_non_philly,
 )
 from utils.ais_lookup import ais_lookup, fetch_service_area_enrichment_data, validate_api_key
-from utils.tomtom_lookup import tomtom_lookup
+from utils.tomtom_lookup import tomtom_lookup, check_tomtom_url
 from utils.zips import ZIPS
 from mapping.ais_properties_fields import POSSIBLE_FIELDS
 from passyunk.parser import PassyunkParser
@@ -243,6 +243,7 @@ class Geocoder:
 
         self.parser: PassyunkParser = PassyunkParser()
         self.session: requests.Session = requests.Session()
+        self.tomtom_url = check_tomtom_url(self.session, self.api_key)
 
         # Programmatically generate other attributes
         self.address_fields: dict = find_address_fields(config)
@@ -651,6 +652,8 @@ class Geocoder:
         tomtom_lookup_args = {
             "sess": self.session,
             "parser": self.parser,
+            "api_key": self.api_key,
+            "tomtom_url": self.tomtom_url,
             "philly_zips": ZIPS,
             "address": api_address,
             "fallback_addr": record["raw_address"].upper(),
@@ -774,8 +777,9 @@ class Geocoder:
         appended to the filename.
         """
 
-        # Validate that the given API key works
+        # Validate that the given API key works for AIS and TomTom
         validate_api_key(self.session, self.api_key)
+        
 
         sink_path = Path(self.out_path).with_suffix(".tmp")
         if sink_path.exists():

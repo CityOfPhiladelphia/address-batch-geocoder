@@ -83,6 +83,8 @@ def test_tomtom_lookup_fetches_both_srids(monkeypatch):
     result = tomtom_lookup.tomtom_lookup(
         sess,
         p,
+        "123",
+        "tomtom.com",
         ["19107"],
         "1234 Market St",
         "1234 MARKET ST",
@@ -124,6 +126,8 @@ def test_tomtom_lookup_only_fetches_4326(monkeypatch):
     result = tomtom_lookup.tomtom_lookup(
         sess,
         p,
+        "123",
+        "tomtom.com",
         ["19107"],
         "1234 Market St",
         "1234 MARKET ST",
@@ -174,6 +178,8 @@ def test_tomtom_lookup_only_fetches_2272(monkeypatch):
     result = tomtom_lookup.tomtom_lookup(
         sess,
         p,
+        "123",
+        "tomtom.com",
         ["19107"],
         "1234 Market St",
         "1234 MARKET ST",
@@ -222,6 +228,8 @@ def test_false_address_returns_none_if_bad_address(monkeypatch):
     result = tomtom_lookup.tomtom_lookup(
         sess,
         p,
+        "123",
+        "tomtom.com",
         ["1111"],
         "1234 Fake St",
         "1234 FAKE ST",
@@ -300,6 +308,8 @@ def test_tomtom_lookup_handles_non_philly_address(monkeypatch):
     result = tomtom_lookup.tomtom_lookup(
         sess,
         p,
+        "123",
+        "tomtom.com",
         ["19107"],
         "1234 Market St",
         "1234 MARKET ST",
