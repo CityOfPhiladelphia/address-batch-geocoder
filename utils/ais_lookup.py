@@ -9,6 +9,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
+CANARY_ADDRESS = "1234 Market St"
 
 
 @dataclass
@@ -23,6 +24,26 @@ class AISResult:
     geocode_x: str = field(default=None)
     geocode_y: str = field(default=None)
 
+
+# ------- Authenticate ------- #
+def validate_api_key(sess, api_key) -> None:
+    """
+    Used to determine whether a given API key is valid. Raises an error if not valid.
+
+    Args:
+        sess: A requests session object
+        api_key: The API key to test
+    """
+    params = {"gatekeeperKey": api_key, "client_id": api_key}
+    
+    try:
+        response = sess.get(f"https://api-prod.phila.gov/ais/v1/search/{quote(CANARY_ADDRESS)}", params=params)
+    
+    except requests.RequestException as e:
+        raise Exception(f"Couldn't connect to AIS.") from e
+    
+    if response.status_code == 401:
+        raise Exception("401 response. Invalid API key.")
 
 # ------- Helper Functions -------- #
 def tiebreak(features: list[dict], zip, strict: bool = False) -> dict:
@@ -95,11 +116,15 @@ def get_intersection_coords(ais_dict: dict) -> list[str, str]:
 )
 def _lookup_service_area(sess: requests.Session, lat: int, lon: int, api_key: str):
     AIS_RATE_LIMITER.wait()
-    ais_url = f"https://api.phila.gov/ais_doc/v1/service_areas/{lon},{lat}"
+    ais_url = f"https://api-prod.phila.gov/ais/v1/service_areas/{lon},{lat}"
     params = {}
-    params["gatekeeperKey"] = api_key
 
-    response = sess.get(ais_url, params=params, timeout=10, verify=False)
+    # To handle backwards compatibility with people still using a gatekeeper key instead of
+    # a client ID, we set both params here
+    params["gatekeeperKey"] = api_key
+    params["client_id"] = api_key
+
+    response = sess.get(ais_url, params=params, timeout=10)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
@@ -240,9 +265,18 @@ def _fetch_ais_coordinates(
     """
 
     AIS_RATE_LIMITER.wait()
-    ais_url = f"https://api.phila.gov/ais/v1/search/{quote(address)}?gatekeeperKey={api_key}&srid={srid}&max_range=0"
+    ais_url = f"https://api-prod.phila.gov/ais/v1/search/{quote(address)}"
+    
+    params = {}
 
-    response = sess.get(ais_url, verify=False)
+    # To handle backwards compatibility with people still using a gatekeeper key instead of
+    # a client ID, we set both params here
+    params["gatekeeperKey"] = api_key
+    params["client_id"] = api_key
+    params["srid"] = srid
+    params["max_range"] = 0
+
+    response = sess.get(ais_url, params=params)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
@@ -307,14 +341,19 @@ def ais_lookup(
 
     # Don't attempt to geocode if address is null
     if address:
+        ais_url = f"https://api-prod.phila.gov/ais/v1/search/{quote(address)}"
+
+        params = {}
+
+        # To handle backwards compatibility with people still using a gatekeeper key instead of
+        # a client ID, we set both params here
+        params["gatekeeperKey"] = api_key
+        params["client_id"] = api_key
+        params["srid"] = 4326
+        params["max_range"] = 0
+
         try:
-            quoted_address = quote(address)
-            ais_url = (
-                "https://api.phila.gov/ais/v1/search/"
-                + quoted_address
-                + f"?gatekeeperKey={api_key}&srid=4326&max_range=0"
-            )
-            response = sess.get(ais_url, verify=False)
+            response = sess.get(ais_url, params=params)
         except:
             print(
                 f"Warning: AIS lookup failed for this address: {address}, {zip}, {original_address}"
@@ -322,7 +361,7 @@ def ais_lookup(
             response = None
     else:
         response = None
-
+    
     if response and response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
     elif response and response.status_code == 429:
