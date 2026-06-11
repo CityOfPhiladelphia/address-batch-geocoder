@@ -5,7 +5,7 @@ from ui.constants import ADDRESS_FILE, ENRICHMENT_FIELDS, HOW_TO_FILEPATH
 from ui.logic import filtered_options, ready_to_geocode, parse_config
 from ui.how_to import render_how_to_page
 from geocoder import Geocoder
-from pathlib import Path
+
 
 # UI Configurations
 # --------- Header and Title -------- #
@@ -174,6 +174,7 @@ def render_config_form() -> dict:
                     nrows=5,
                     encoding="utf-8-sig",
                     dtype="str",
+                    encoding_errors='ignore'
                 )
                 st.subheader(":blue[Preview (first 5 rows)]")
                 st.dataframe(preview_df)
