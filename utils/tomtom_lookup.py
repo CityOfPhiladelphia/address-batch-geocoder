@@ -16,19 +16,12 @@ def check_tomtom_url(
     """
 
     tomtom_url = "https://api-prod.phila.gov/TomTom/v1/findAddressCandidates"
-    params = {"client_id": api_key, "Address": CANARY_ADDRESS, "f": "pjson"}
+    params = {"client_id": api_key, "gatekeeperKey": api_key, "Address": CANARY_ADDRESS, "f": "pjson"}
 
     response = sess.get(tomtom_url, params=params)
 
     if response.status_code == 401:
-        fallback_tomtom_url = "https://citygeo-geocoder-aws.phila.city/arcgis/rest/services/TomTom/US_StreetAddress/GeocodeServer/findAddressCandidates"
-
-        new_response = sess.get(fallback_tomtom_url, params=params)
-
-        if new_response.status_code == 401:
-            raise Exception("Invalid API key.")
-        
-        return fallback_tomtom_url
+        raise Exception("Invalid API key.")
 
     return tomtom_url
 
@@ -44,7 +37,7 @@ def _fetch_tomtom_coordinates(
     Returns (coord1, coord2) or (None, None) if failed.
     """
     TOMTOM_RATE_LIMITER.wait()
-    params = {"Address": address, "f": "pjson", "outSR": str(srid), "client_id": api_key}
+    params = {"Address": address, "f": "pjson", "outSR": str(srid), "client_id": api_key, "gatekeeperKey": api_key}
 
     response = sess.get(tomtom_url, params=params, timeout=10)
 
@@ -85,7 +78,7 @@ def _do_tomtom_lookup(
         return None
 
     TOMTOM_RATE_LIMITER.wait()
-    params = {"Address": address, "f": "pjson", "outSR": "4326", "client_id": api_key}
+    params = {"Address": address, "f": "pjson", "outSR": "4326", "client_id": api_key, "gatekeeperKey": api_key}
 
     response = sess.get(tomtom_url, params=params, timeout=10)
 

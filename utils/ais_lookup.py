@@ -124,7 +124,7 @@ def _lookup_service_area(sess: requests.Session, lat: int, lon: int, api_key: st
     params["gatekeeperKey"] = api_key
     params["client_id"] = api_key
 
-    response = sess.get(ais_url, params=params, timeout=10, verify=False)
+    response = sess.get(ais_url, params=params, timeout=10)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
@@ -276,7 +276,7 @@ def _fetch_ais_coordinates(
     params["srid"] = srid
     params["max_range"] = 0
 
-    response = sess.get(ais_url, verify=False, params=params)
+    response = sess.get(ais_url, params=params)
 
     if response.status_code >= 500:
         raise Exception("5xx response. There may be a problem with the AIS API.")
@@ -353,7 +353,7 @@ def ais_lookup(
         params["max_range"] = 0
 
         try:
-            response = sess.get(ais_url, verify=False, params=params)
+            response = sess.get(ais_url, params=params)
         except:
             print(
                 f"Warning: AIS lookup failed for this address: {address}, {zip}, {original_address}"
