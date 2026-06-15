@@ -313,7 +313,7 @@ def ais_lookup(
     api_key: str,
     address: str,
     zip: str = None,
-    enrichment_fields: list = None,
+    enrichment_fields: list = [],
     existing_is_addr: bool = False,
     existing_is_philly_addr: bool = False,
     original_address: str = None,
@@ -386,7 +386,28 @@ def ais_lookup(
 
         search_type = r_json.get("search_type")
 
-        if search_type == "address":
+        # Intersection returns a different data structure with fewer
+        # possible enrichment fields, so we need to handle this differently
+        if search_type == "intersection":
+
+            parsed_response = parse_intersection_lookup(
+                sess, api_key, r_json, original_address, zip, enrichment_fields
+            )
+
+            # If tiebreak fails, return
+            # null values for most fields.
+            if not parsed_response:
+                ais_result = AISResult(
+                    output_address=original_address if original_address else address,
+                    is_addr=False,
+                    is_philly_addr=True,
+                    is_multiple_match=False,
+                    geocoder_used="ais-intersection",
+                )
+
+                return asdict(ais_result)
+        
+        else:
 
             parsed_response = parse_address_lookup(r_json, zip, enrichment_fields)
 
@@ -407,26 +428,6 @@ def ais_lookup(
 
                 return asdict(ais_result)
 
-        # Intersection returns a different data structure with fewer
-        # possible enrichment fields, so we need to handle this differently
-        elif search_type == "intersection":
-
-            parsed_response = parse_intersection_lookup(
-                sess, api_key, r_json, original_address, zip, enrichment_fields
-            )
-
-            # If tiebreak fails, return
-            # null values for most fields.
-            if not parsed_response:
-                ais_result = AISResult(
-                    output_address=original_address if original_address else address,
-                    is_addr=False,
-                    is_philly_addr=True,
-                    is_multiple_match=False,
-                    geocoder_used="ais-intersection",
-                )
-
-                return asdict(ais_result)
 
         # We use the original address here because the address that we use
         # to search against AIS may be augmented with PHILADELPHIA, PA
