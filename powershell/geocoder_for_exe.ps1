@@ -9,6 +9,8 @@ $ScriptDirectory = (Resolve-Path -LiteralPath $ScriptDirectory).ProviderPath
 $installFolder      = Join-Path $ScriptDirectory 'address-geocoder-main'
 $dataDirectory      = Join-Path $ScriptDirectory 'geocoder_address_data'
 $powershellDirectory = Join-Path $installFolder 'powershell'
+$logDirectory       = Join-Path $ScriptDirectory 'log'
+$logFile            = Join-Path $logDirectory 'geocoder_exe.log' 
 $versionFile        = Join-Path $ScriptDirectory 'release.txt'
 $s3URL              = 'https://opendata-downloads.s3.amazonaws.com/address_service_area_summary_public.csv.gz'
 $addressFileGZ      = Join-Path $dataDirectory   'address_service_area_summary.csv.gz'
@@ -29,7 +31,31 @@ $repo = "address-batch-geocoder"
 $branch = "origin/main"
 
 # Exe version, used to check if we need to force user to update
-$exeVersion = "2.1.3"
+$exeVersion = "2.2.0"
+
+
+# Clear log file if exists, create log directory and log file if not exists
+function initializeLogFile {
+
+    if (-not (Test-Path -Path $logDirectory -PathType Container)) {
+
+        New-Item -Path $logDirectory -ItemType Directory | Out-Null
+        Write-Host "Created logging directory at $logDirectory." -ForegroundColor Green
+    }
+
+    if (-not (Test-Path -Path $logFile -PathType Leaf)) {
+
+        New-Item -Path $logFile -ItemType File | Out-Null
+
+    }
+
+    # If the file already exists, overwrite it for this run
+    else {
+    
+        "--- Geocoder.exe started at $(Get-Date) --- " *> $logFile
+
+    }
+}
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
@@ -155,7 +181,8 @@ function createVenvAndConfig {
 
     Push-Location $installFolder
 
-    & uv sync --link-mode=copy 2>$null
+   "Installing packages with uv at $(Get-Date)" *>> $logFile
+    & uv sync --link-mode=copy *>> $logFile
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Package installation failed." -ForegroundColor Red
         Read-Host "Press Enter to exit"
@@ -184,7 +211,8 @@ function cloneOrUpdate {
         Push-Location $installFolder
         
         try {
-            git fetch origin 2>&1 | ForEach-Object { Write-Host $_}
+            "Fetching updates from GitHub at $(Get-Date)" *>> $logFile
+            git fetch origin *>> $logFile
 
 
             if ($LASTEXITCODE -ne 0) {
@@ -229,7 +257,8 @@ function cloneOrUpdate {
         Write-Host "Repository not found. Cloning..."
         
         try {
-            git clone $repoURL $installFolder 2>&1 | ForEach-Object { Write-Host $_ }
+            "Cloning GitHub repository at $(Get-Date)" *>> $logFile
+            git clone $repoURL $installFolder *>> $logFile
 
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "Failed to clone repository." -ForegroundColor Red
@@ -391,6 +420,7 @@ $script:RepoWasJustCloned = $false
 $script:RepoWasUpdated = $false
 
 # Execute installation steps
+initializeLogFile
 installGit
 installUv
 cloneOrUpdate

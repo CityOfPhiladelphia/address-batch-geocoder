@@ -15,7 +15,7 @@ on:
     workflow_dispatch:
 
 jobs:
-    audit:
+    check-lockfile-and-audit:
         runs-on: ubuntu-latest
         permissions:
           contents: read
@@ -29,6 +29,9 @@ jobs:
 
               with:
                 version: "latest"
-
+            
+            - name: Check if uv.lock is up to date
+              run: uv lock --check
+              
             - name: Audit dependencies
               run: uv audit

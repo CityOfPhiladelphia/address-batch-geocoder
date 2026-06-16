@@ -46,6 +46,7 @@ copyright = """Copyright &copy; 2026 City of Philadelphia"""
 nav = [
   {"Home" = "index.md"},
   {"Installation" = "installation.md"},
+  {"Troubleshooting" = "troubleshooting.md"},
   {"Using the Geocoder" = [
      "using_the_geocoder/index.md",
     {"Using the GUI" = "using_the_geocoder/gui.md"},
