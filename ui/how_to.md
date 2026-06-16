@@ -1,20 +1,26 @@
+## Have Questions?
+
+The **Address Batch Geocoder Documentation** includes detailed instructions, a full list of enrichment fields, and explanations of the matching methodology.
+
+[Open the Address Batch Geocoder Documentation](https://cityofphiladelphia.github.io/address-batch-geocoder/)
+
 ## Running the Geocoder
 
 **Select settings input** &mdash; Choose whether or not you wish to manually enter the settings, or load the settings from a configuration file. Loading the settings from a configuration file will prepopulate any configuration values set in that file.
 
-![image-20260505100005292](address-geocoder-main/static/settings_input.png)
+![image-20260505100005292](static/settings_input.png)
 
 ### Manually Configuring a Run
 
 **Choose a run type** &mdash; You have the option to geocode a new file, or resume a partially geocoded file. Because geocoding may take a while, the option to resume a file exists to continue files that may have been partially geocoded and interrupted.
 
-![image-20260505100402609](address-geocoder-main/static/run_type_select.png)
+![image-20260505100402609](static/run_type_select.png)
 
 
 
 #### **Configuring your run**
 
-![image-20260505101920373](address-geocoder-main/static/api_key_file_path.png)
+![image-20260505101920373](static/api_key_file_path.png)
 
 **You will need to provide**:
 
@@ -23,13 +29,13 @@
 * The Input File field. Paste in the full file path of the file that you wish to enrich. You can do this by finding the file in your file explorer, right clicking it, and selecting 'Copy as path', and then pasting the result in the input field.
 * **If you are resuming a file:** The input file should still be the file path of the original input file you used to geocode, not the partially geocoded file. Keep in mind, that **the partially geocoded file must also exist in the same folder as the input file for this to work.**
 
-![image-20260505102221872](address-geocoder-main/static/copy_as_path.png)
+![image-20260505102221872](static/copy_as_path.png)
 
 **Load the file**
 
 Once you have entered the API key and the input file, click the "Load file" button. This will render a preview of the file.
 
-![image-20260505102626265](address-geocoder-main/static/preview.png)
+![image-20260505102626265](static/preview.png)
 
 **Map address fields** 
 
@@ -37,11 +43,11 @@ Next, map your address fields:
 
 * You can map a single address field (if all address information on your input file is on the same line)
 
-![image-20260505102719761](address-geocoder-main/static/single_address_field.png)
+![image-20260505102719761](static/single_address_field.png)
 
 * Or you can map separate address / city / state/ zip fields
 
-![image-20260505102836656](address-geocoder-main/static/separate_address_fields.png)
+![image-20260505102836656](static/separate_address_fields.png)
 
 **If you are starting a new file, select which fields you want returned** 
 
@@ -49,11 +55,11 @@ If you are starting a new file, select which enrichment fields you want to add:
 
 * Choose which SRIDs you would like to geocode for. You have an option between WGS 84 (4326), the Pennsylvania State Plane (2272), or both.
 
-  ![image-20260505103045985](address-geocoder-main/static/srid_select.png)
+  ![image-20260505103045985](static/srid_select.png)
 
 * Select which additional optional enrichment fields you wish to add to your data. There are around 80 to choose from. You can use the selection widget to search for options if you don't wish to scroll through everything.
 
-![image-20260505103136307](address-geocoder-main/static/enrichment_field_select.png)
+![image-20260505103136307](static/enrichment_field_select.png)
 
 This option will not appear if you are resuming a partially geocoded file, because the enrichment fields must match what is in the partially geocoded file.
 
@@ -61,7 +67,7 @@ This option will not appear if you are resuming a partially geocoded file, becau
 
 Once the required fields are entered, a geocode button will appear. You can geocode the file.
 
-![image-20260505103230160](address-geocoder-main/static/geocode_button.png)
+![image-20260505103230160](static/geocode_button.png)
 
 **Do not close the browser** while geocoding is in progress &mdash; you will be unable to download your results. 
 
@@ -69,7 +75,7 @@ When geocoding is completed, you will see a green notification appear, containin
 
 To close the geocoder, you will need to close both the browser window and the terminal window running geocoder.exe.
 
-![image-20260505105021763](address-geocoder-main/static/geocoding_complete.png)
+![image-20260505105021763](static/geocoding_complete.png)
 
 **Saving your configuration for later**
 
@@ -81,16 +87,16 @@ If you choose to load settings from a file, you will need to have a `.yml` file 
 
 #### Click the upload button and upload your file
 
-![image-20260505103557925](address-geocoder-main/static/config_upload.png)
+![image-20260505103557925](static/config_upload.png)
 
 If your config file has a run type, an API key and an input file field in it, these fields will be populated for you.
 
-![image-20260505103726033](address-geocoder-main/static/api_key_file_path_resume.png)
+![image-20260505103726033](static/api_key_file_path_resume.png)
 
 #### Load your file
 
 Click the load file button. Anything present in the config file should prepopulate in the appropriate fields.
 
-![image-20260505104532708](address-geocoder-main/static/resume_pre_populated_config.png)
+![image-20260505104532708](static/resume_pre_populated_config.png)
 
 Once you are finished configuring your run, press Geocode and wait for the results.
