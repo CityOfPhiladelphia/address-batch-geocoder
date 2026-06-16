@@ -52,7 +52,7 @@ function initializeLogFile {
     # If the file already exists, overwrite it for this run
     else {
     
-        "--- Geocoder.exe started at $(Get-Date) --- " *> $logFile
+        "--- Geocoder.exe started at $(Get-Date) --- " > $logFile
 
     }
 }
