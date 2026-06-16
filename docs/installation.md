@@ -20,6 +20,9 @@ Extract the zip folder into a folder where you can easily find it. When opening 
 
 The zip folder contains two files: `geocoder.exe` and `release.txt`. If you delete or rename these files, you will need to download them again or rename them back. Deleting `release.txt` will stop the program from being able to inform you if there is a new version of the `.exe` file that you need to download.
 
+!!! warning "Warning: Do not install the geocoder to OneDrive."
+    One Drive saves temporary files and locks access to files in a way that corrupt the Geocoder installation. If you need to geocode files in OneDrive, It's better to install the Geocoder to your local desktop, and then give it the filepath to the files in OneDrive that you want to geocode.
+
 ## :lucide-play: Running the program for the first time
 Double-clicking `geocoder.exe` will launch the program. You may see a popup that says "Windows protected your PC." This file is safe, so bypass this protection by clicking `More info,` and then selecting `Run anyway`.
 
