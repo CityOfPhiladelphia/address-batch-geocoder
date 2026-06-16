@@ -29,7 +29,7 @@ $repo = "address-batch-geocoder"
 $branch = "origin/main"
 
 # Exe version, used to check if we need to force user to update
-$exeVersion = "2.1.0"
+$exeVersion = "2.1.3"
 
 function checkToolVersion {
     # Check if we have the version file (won't exist until repo is cloned)
@@ -155,7 +155,7 @@ function createVenvAndConfig {
 
     Push-Location $installFolder
 
-    & uv sync 2>$null
+    & uv sync --link-mode=copy 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Package installation failed." -ForegroundColor Red
         Read-Host "Press Enter to exit"
