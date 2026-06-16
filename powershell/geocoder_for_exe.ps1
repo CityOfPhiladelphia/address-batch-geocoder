@@ -182,7 +182,7 @@ function createVenvAndConfig {
     Push-Location $installFolder
 
    "Installing packages with uv at $(Get-Date)" *>> $logFile
-    & uv sync --link-mode=copy *>> $logFile
+    & uv sync --frozen --link-mode=copy *>> $logFile
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Package installation failed." -ForegroundColor Red
         Read-Host "Press Enter to exit"
