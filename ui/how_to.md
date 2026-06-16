@@ -1,4 +1,4 @@
-##  Have Questions?
+## Have Questions?
 
 The **Address Batch Geocoder Documentation** includes detailed instructions, a full list of enrichment fields, and explanations of the matching methodology.
 
