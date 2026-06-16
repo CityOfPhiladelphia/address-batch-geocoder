@@ -1,3 +1,9 @@
+## Have Questions?
+
+The **Address Batch Geocoder Documentation** includes detailed instructions, a full list of enrichment fields, and explanations of the matching methodology.
+
+[Open the Address Batch Geocoder Documentation](https://cityofphiladelphia.github.io/address-batch-geocoder/)
+
 ## Running the Geocoder
 
 **Select settings input** &mdash; Choose whether or not you wish to manually enter the settings, or load the settings from a configuration file. Loading the settings from a configuration file will prepopulate any configuration values set in that file.
