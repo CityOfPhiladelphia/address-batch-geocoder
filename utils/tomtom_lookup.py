@@ -4,7 +4,7 @@ from retrying import retry
 from .parse_address import tag_full_address, flag_non_philly_address
 from .ais_lookup import _round_coordinates
 
-TOMTOM_RATE_LIMITER = RateLimiter(max_calls=10, period=1.0)
+TOMTOM_RATE_LIMITER = RateLimiter(max_calls=30, period=1.0)
 CANARY_ADDRESS = "1234 Market St"
 
 def check_tomtom_url(

@@ -8,7 +8,7 @@ import urllib3
 # Suppress the InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-AIS_RATE_LIMITER = RateLimiter(max_calls=5, period=1.0)
+AIS_RATE_LIMITER = RateLimiter(max_calls=30, period=1.0)
 CANARY_ADDRESS = "1234 Market St"
 
 
